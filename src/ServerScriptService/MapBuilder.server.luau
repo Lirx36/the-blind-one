@@ -53,12 +53,24 @@ Lighting.ClockTime = 0
 Lighting.Brightness = 2
 Lighting.Ambient = Color3.fromRGB(30, 30, 38) -- lifted so unlit areas aren't a black void that "pops"
 Lighting.OutdoorAmbient = Color3.fromRGB(16, 16, 24)
-Lighting.EnvironmentDiffuseScale = 0.3
-Lighting.EnvironmentSpecularScale = 0.1
+Lighting.EnvironmentDiffuseScale = 0 -- no skybox light leaking indoors
+Lighting.EnvironmentSpecularScale = 0
 Lighting.GlobalShadows = true
 Lighting.FogColor = Color3.fromRGB(2, 2, 4)
 Lighting.FogStart = 30
 Lighting.FogEnd = 170
+
+-- kill the view-dependent post effects that make the whole scene brighten/darken
+-- as you turn the camera (atmospheric scattering, god-rays, bloom, DoF)
+for _, fx in Lighting:GetChildren() do
+	if fx:IsA("Atmosphere") then
+		fx.Density = 0
+		fx.Haze = 0
+		fx.Glare = 0
+	elseif fx:IsA("SunRaysEffect") or fx:IsA("BloomEffect") or fx:IsA("DepthOfFieldEffect") then
+		fx.Enabled = false
+	end
+end
 
 ------------------------------------------------------------------- floor + ceiling
 for i = 0, GRID - 1 do
