@@ -83,12 +83,24 @@ end
 local patrolNodes: { Vector3 } = {}
 
 local function spawnMonster()
-	patrolNodes = gatherNodes()
-	-- start as far as possible from the player spawn so nobody dies on frame one
+	-- wait until MapBuilder has actually placed nodes
+	for _ = 1, 40 do
+		patrolNodes = gatherNodes()
+		if #patrolNodes > 0 then
+			break
+		end
+		task.wait(0.25)
+	end
+	if #patrolNodes == 0 then
+		warn("MonsterService: no PatrolNodes found -- is MapBuilder erroring? Monster not spawned.")
+		return
+	end
+
+	-- start on the node farthest from the player spawn pad
 	local spawnPart = workspace:FindFirstChild("GeneratedMap")
 		and (workspace.GeneratedMap :: Instance):FindFirstChild("Spawn") :: BasePart?
 	local origin = spawnPart and spawnPart.Position or Vector3.zero
-	local start = Vector3.new(0, 6, 0)
+	local start = patrolNodes[1]
 	local bestD = -1
 	for _, node in patrolNodes do
 		local d = (node - origin).Magnitude
@@ -267,6 +279,24 @@ RunService.Heartbeat:Connect(function(dt)
 	monster:PivotTo(CFrame.new(newPos) * easedRot)
 end)
 
+-- brief invulnerability right after (re)spawning
+local spawnedAt: { [Player]: number } = {}
+local function armGrace(player: Player)
+	player.CharacterAdded:Connect(function()
+		spawnedAt[player] = os.clock()
+	end)
+	if player.Character then
+		spawnedAt[player] = os.clock()
+	end
+end
+for _, p in Players:GetPlayers() do
+	armGrace(p)
+end
+Players.PlayerAdded:Connect(armGrace)
+Players.PlayerRemoving:Connect(function(p)
+	spawnedAt[p] = nil
+end)
+
 -- catch check + dread broadcast
 RunService.Heartbeat:Connect(function()
 	if not monster.Parent then
@@ -278,11 +308,11 @@ RunService.Heartbeat:Connect(function()
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		if hrp and hum and hum.Health > 0 then
 			local d = (hrp.Position - root.Position).Magnitude
-			if d < Config.MonsterCatchDistance then
+			local graced = os.clock() - (spawnedAt[player] or 0) < Config.SpawnGrace
+			if d < Config.MonsterCatchDistance and not graced then
 				catchBindable:Fire(player)
 			end
-			local dread = math.clamp(1 - d / 45, 0, 1)
-			Remotes.Dread:FireClient(player, dread)
+			Remotes.Dread:FireClient(player, math.clamp(1 - d / 45, 0, 1))
 		end
 	end
 end)

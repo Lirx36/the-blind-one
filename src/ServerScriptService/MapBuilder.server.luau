@@ -44,7 +44,11 @@ local function roomCenter(i: number, j: number): Vector3
 end
 
 ------------------------------------------------------------------- dark lighting
-Lighting.Technology = Enum.Technology.Future -- smooth per-pixel light; kills the voxel "popping"
+-- Lighting.Technology can't be set from a script -- set it once in Studio:
+-- Explorer > Lighting > Properties > Technology = Future  (persists in the place file).
+pcall(function()
+	(Lighting :: any).Technology = Enum.Technology.Future
+end)
 Lighting.ClockTime = 0
 Lighting.Brightness = 1
 Lighting.Ambient = Color3.fromRGB(18, 18, 24) -- floor of darkness; horror-dark but not pitch black
