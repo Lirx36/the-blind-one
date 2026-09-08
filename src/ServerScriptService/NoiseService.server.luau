@@ -10,9 +10,23 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 
-local noiseBindable = Instance.new("BindableEvent")
-noiseBindable.Name = "Noise"
-noiseBindable.Parent = ServerStorage
+-- Reuse one noise bus when Rojo restarts this script during a playtest.
+local noiseBindable = ServerStorage:FindFirstChild("Noise") :: BindableEvent?
+if noiseBindable and not noiseBindable:IsA("BindableEvent") then
+	noiseBindable:Destroy()
+	noiseBindable = nil
+end
+if not noiseBindable then
+	noiseBindable = Instance.new("BindableEvent")
+	noiseBindable.Name = "Noise"
+	noiseBindable.Parent = ServerStorage
+end
+for _, child in ServerStorage:GetChildren() do
+	if child.Name == "Noise" and child ~= noiseBindable then
+		child:Destroy()
+	end
+end
+local noiseEvent = noiseBindable :: BindableEvent
 
 local NOISE_TARGET = {
 	idle = Config.NoiseIdle,
@@ -21,19 +35,30 @@ local NOISE_TARGET = {
 	sprint = Config.NoiseSprint,
 }
 
+local MOVE_SPEED = {
+	idle = Config.WalkSpeed,
+	walk = Config.WalkSpeed,
+	crouch = Config.CrouchSpeed,
+	sprint = Config.SprintSpeed,
+}
+
 type State = { meter: number, move: string, lastStep: number }
 local states: { [Player]: State } = {}
 
-Players.PlayerAdded:Connect(function(player)
+local function setupPlayer(player: Player)
 	states[player] = { meter = 0, move = "idle", lastStep = 0 }
-end)
+end
+for _, player in Players:GetPlayers() do
+	setupPlayer(player)
+end
+Players.PlayerAdded:Connect(setupPlayer)
 Players.PlayerRemoving:Connect(function(player)
 	states[player] = nil
 end)
 
 Remotes.SetMoveState.OnServerEvent:Connect(function(player, move)
 	local st = states[player]
-	if st and NOISE_TARGET[move] ~= nil then
+	if st and typeof(move) == "string" and NOISE_TARGET[move] ~= nil then
 		st.move = move
 	end
 end)
@@ -49,6 +74,23 @@ RunService.Heartbeat:Connect(function(dt)
 			st.meter = math.max(0, st.meter - Config.NoiseSmoothing * 6 * dt)
 			player:SetAttribute("Noise", st.meter)
 			continue
+		end
+		if player:GetAttribute("Role") == "BlindOne" then
+			st.meter = 0
+			st.move = "idle"
+			player:SetAttribute("Noise", 0)
+			if hum.WalkSpeed ~= Config.PlayerBlindOneSpeed then
+				hum.WalkSpeed = Config.PlayerBlindOneSpeed
+			end
+			continue
+		end
+
+		-- Humanoid properties are server-authoritative in newer authority modes.
+		-- Mirror the client's validated movement state so WalkSpeed cannot be
+		-- discarded by replication after the local controller applies it.
+		local desiredSpeed = MOVE_SPEED[st.move] or Config.WalkSpeed
+		if hum.WalkSpeed ~= desiredSpeed then
+			hum.WalkSpeed = desiredSpeed
 		end
 
 		local vel = hrp.AssemblyLinearVelocity
@@ -70,7 +112,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local interval = Config.FootstepInterval * (st.move == "sprint" and 0.6 or 1)
 			if now - st.lastStep >= interval then
 				st.lastStep = now
-				noiseBindable:Fire(hrp.Position, st.meter)
+				noiseEvent:Fire(hrp.Position, st.meter)
 			end
 		end
 	end

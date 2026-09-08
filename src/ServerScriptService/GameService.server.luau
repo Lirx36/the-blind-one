@@ -4,15 +4,31 @@ local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 
 local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 
-local catchBindable = Instance.new("BindableEvent")
-catchBindable.Name = "CatchPlayer"
-catchBindable.Parent = ServerStorage
+-- Keep one catch bus across Rojo hot reloads and discard duplicate buses left by
+-- older script runs.
+local catchBindable = ServerStorage:FindFirstChild("CatchPlayer") :: BindableEvent?
+if catchBindable and not catchBindable:IsA("BindableEvent") then
+	catchBindable:Destroy()
+	catchBindable = nil
+end
+if not catchBindable then
+	catchBindable = Instance.new("BindableEvent")
+	catchBindable.Name = "CatchPlayer"
+	catchBindable.Parent = ServerStorage
+end
+for _, child in ServerStorage:GetChildren() do
+	if child.Name == "CatchPlayer" and child ~= catchBindable then
+		child:Destroy()
+	end
+end
+local catchEvent = catchBindable :: BindableEvent
 
 Players.RespawnTime = Config.RespawnDelay
 Players.CharacterAutoLoads = true
@@ -25,25 +41,66 @@ local function setObjective(player: Player, text: string)
 	Remotes.Objective:FireClient(player, text)
 end
 
-Players.PlayerAdded:Connect(function(player)
+local function removeOrphanedCharacters(player: Player, currentCharacter: Model)
+	for _, child in workspace:GetChildren() do
+		if child:IsA("Model")
+			and child ~= currentCharacter
+			and child.Name == player.Name
+			and child:FindFirstChildOfClass("Humanoid") then
+			child:Destroy()
+		end
+	end
+end
+
+local function onCharacter(player: Player, char: Model)
+	player:SetAttribute("HasKey", false)
+	caughtDebounce[player] = nil
+	removeOrphanedCharacters(player, char)
+	local ff = char:FindFirstChildOfClass("ForceField")
+	if ff then
+		ff:Destroy()
+	end
+	task.wait(0.5)
+	if player:GetAttribute("Role") == "BlindOne" then
+		setObjective(player, "YOU ARE THE BLIND ONE — follow sound and catch every survivor.")
+	else
+		setObjective(player, START_OBJECTIVE)
+	end
+end
+
+local function setupPlayer(player: Player)
 	player:SetAttribute("HasKey", false)
 	player.CharacterAdded:Connect(function(char)
-		player:SetAttribute("HasKey", false)
-		caughtDebounce[player] = nil
-		local ff = char:FindFirstChildOfClass("ForceField")
-		if ff then
-			ff:Destroy()
-		end
-		task.wait(0.5)
-		setObjective(player, START_OBJECTIVE)
+		onCharacter(player, char)
 	end)
-end)
+	local currentCharacter = player.Character
+	if currentCharacter then
+		task.spawn(onCharacter, player, currentCharacter)
+	end
+end
+
+for _, player in Players:GetPlayers() do
+	setupPlayer(player)
+end
+Players.PlayerAdded:Connect(setupPlayer)
 Players.PlayerRemoving:Connect(function(player)
 	caughtDebounce[player] = nil
 end)
 
-catchBindable.Event:Connect(function(player: Player)
+catchEvent.Event:Connect(function(player: Player, caughtByHuman: boolean?)
 	if caughtDebounce[player] then
+		return
+	end
+	if player:GetAttribute("Role") == "BlindOne" then
+		return
+	end
+	if Config.StudioSafeMode and RunService:IsStudio() and not caughtByHuman then
+		-- Keep the AI active for movement/hearing tests without repeatedly killing
+		-- the tester. This branch can never run in a published Roblox server.
+		caughtDebounce[player] = true
+		task.delay(1, function()
+			caughtDebounce[player] = nil
+		end)
 		return
 	end
 	local char = player.Character
@@ -61,7 +118,7 @@ end)
 local function onKeyTouched(hit: BasePart, key: BasePart)
 	local char = hit:FindFirstAncestorOfClass("Model")
 	local player = char and Players:GetPlayerFromCharacter(char)
-	if not player or player:GetAttribute("HasKey") then
+	if not player or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("HasKey") then
 		return
 	end
 	player:SetAttribute("HasKey", true)
@@ -73,7 +130,7 @@ end
 local function onExitTouched(hit: BasePart)
 	local char = hit:FindFirstAncestorOfClass("Model")
 	local player = char and Players:GetPlayerFromCharacter(char)
-	if not player then
+	if not player or player:GetAttribute("Role") == "BlindOne" then
 		return
 	end
 	if not player:GetAttribute("HasKey") then

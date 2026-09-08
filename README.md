@@ -15,6 +15,8 @@ Working title, rename freely.
 - A **flashlight** helps *you* and costs you nothing — the genre expectation that light
   draws danger is inverted here.
 - Objective: find the **key**, reach the **exit**. Get caught → jumpscare → respawn.
+- With two or more players, one player is chosen as **The Blind One**. They hunt
+  sound silhouettes while the AI takes a break; solo games continue using the AI.
 
 ## What's in here
 
@@ -50,13 +52,16 @@ Same as any Rojo project:
 
 Test solo — you vs the monster is the whole loop right now.
 
+To test the player-controlled monster, use Studio's multi-client test with at least
+two players. One client is selected automatically and spawns at the monster end.
+
 ## Controls
 
 | Action | Input |
 | --- | --- |
 | Move | WASD |
-| Sprint (hold) | Left Shift — loud, drains stamina |
-| Crouch (toggle) | C — slow, near-silent |
+| Sprint (hold) | Shift — loud, drains stamina |
+| Crouch (hold) | Ctrl — slow, near-silent |
 | Flashlight | F |
 | Pick up rock | E (near one) |
 | Throw rock | Left click — makes a loud noise where it lands |

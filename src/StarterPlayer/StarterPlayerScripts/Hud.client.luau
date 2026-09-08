@@ -47,19 +47,6 @@ vignette.BorderSizePixel = 0
 vignette.ZIndex = 5
 vignette.Parent = gui
 
--- TEMP debug readout (top-left)
-local debugLabel = Instance.new("TextLabel")
-debugLabel.Size = UDim2.fromOffset(260, 20)
-debugLabel.Position = UDim2.fromOffset(12, 12)
-debugLabel.BackgroundTransparency = 1
-debugLabel.Font = Enum.Font.Code
-debugLabel.TextSize = 14
-debugLabel.TextXAlignment = Enum.TextXAlignment.Left
-debugLabel.TextColor3 = Color3.fromRGB(120, 255, 140)
-debugLabel.TextStrokeTransparency = 0.4
-debugLabel.Text = ""
-debugLabel.Parent = gui
-
 -- objective
 local objective = Instance.new("TextLabel")
 objective.Size = UDim2.new(1, 0, 0, 30)
@@ -133,6 +120,8 @@ Remotes.HeldCount.OnClientEvent:Connect(function(n: number)
 end)
 
 RunService.RenderStepped:Connect(function()
+	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
+	panel.Visible = not isBlindOne
 	local nr = math.clamp(noise / 100, 0, 1)
 	noiseFill.Size = UDim2.fromScale(nr, 1)
 	noiseFill.BackgroundColor3 = Color3.fromRGB(120, 200, 140):Lerp(Color3.fromRGB(230, 70, 70), nr)
@@ -141,13 +130,9 @@ RunService.RenderStepped:Connect(function()
 	stamFill.Size = UDim2.fromScale(sr, 1)
 	stamFill.BackgroundColor3 = sr < 0.25 and Color3.fromRGB(230, 120, 90) or Color3.fromRGB(90, 150, 230)
 
-	debugLabel.Text = ("%s  ws=%d  stam=%d%%"):format(
-		tostring(ClientState.move),
-		math.floor(ClientState.walkSpeed or 0),
-		math.floor(sr * 100)
-	)
-
 	-- dread overlay: base darkness + pulse
 	local pulse = dread > 0.15 and (math.sin(os.clock() * (6 + dread * 10)) * 0.5 + 0.5) * dread * 0.3 or 0
-	vignette.BackgroundTransparency = math.clamp(1 - (dread * 0.6 + pulse), 0.3, 1)
+	vignette.BackgroundTransparency = if isBlindOne
+		then 1
+		else math.clamp(1 - (dread * 0.6 + pulse), 0.3, 1)
 end)

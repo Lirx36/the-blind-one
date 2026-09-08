@@ -13,7 +13,7 @@ return {
 	-- Each player has a 0..100 "noise" meter. The monster hears the world in the
 	-- same units: a sound of loudness L is audible out to about L * NoiseCarry studs.
 	NoiseWalk = 24, -- meter target while walking at full speed
-	NoiseCrouch = 5,
+	NoiseCrouch = 3,
 	NoiseSprint = 78,
 	NoiseIdle = 0,
 	NoiseSmoothing = 6, -- how fast the meter chases its target, per second
@@ -34,8 +34,11 @@ return {
 	MonsterRepath = 0.35, -- seconds between path recomputes
 	MonsterHuntNoise = 42, -- heard loudness at short range that escalates INVESTIGATE -> HUNT
 	MonsterHuntRange = 22, -- ...within this distance
+	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
+	PlayerBlindOneSpeed = 18,
 
 	-- ---- round ----
+	StudioSafeMode = true, -- in Studio the monster can chase, but cannot kill players
 	RespawnDelay = 3,
 	SpawnGrace = 3, -- seconds of immunity right after (re)spawning
 	StartThrowables = 3,

@@ -14,6 +14,23 @@ local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 local catchBindable = ServerStorage:WaitForChild("CatchPlayer") :: BindableEvent
 
+local function humanBlindOne(): Player?
+	for _, player in Players:GetPlayers() do
+		if player:GetAttribute("Role") == "BlindOne" then
+			return player
+		end
+	end
+	return nil
+end
+
+-- Rojo can restart this script during a live playtest. Remove the model made by
+-- the previous run so hot-syncing never leaves duplicate monsters behind.
+for _, child in workspace:GetChildren() do
+	if child.Name == "TheBlindOne" then
+		child:Destroy()
+	end
+end
+
 local AGENT = {
 	AgentRadius = 3,
 	AgentHeight = 7,
@@ -66,6 +83,10 @@ humanoid.WalkSpeed = 0 -- movement is done by CFrame; the Humanoid is just for H
 humanoid.AutoRotate = false
 humanoid.BreakJointsOnDeath = false
 humanoid.EvaluateStateMachine = false
+humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+humanoid.NameDisplayDistance = 0
+humanoid.HealthDisplayDistance = 0
 humanoid.Parent = monster
 
 ------------------------------------------------------------------- patrol points
@@ -81,6 +102,7 @@ end
 
 ------------------------------------------------------------------- start / spawn
 local patrolNodes: { Vector3 } = {}
+local spawnReady = false
 
 local function spawnMonster()
 	-- wait until MapBuilder has actually placed nodes
@@ -108,8 +130,11 @@ local function spawnMonster()
 			bestD, start = d, node
 		end
 	end
-	monster.Parent = workspace
 	monster:PivotTo(CFrame.new(Vector3.new(start.X, ROOT_Y, start.Z)))
+	spawnReady = true
+	if not humanBlindOne() then
+		monster.Parent = workspace
+	end
 end
 
 ------------------------------------------------------------------- hearing model
@@ -156,6 +181,9 @@ end
 
 local function pollPlayers()
 	for _, player in Players:GetPlayers() do
+		if player:GetAttribute("Role") == "BlindOne" then
+			continue
+		end
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -253,6 +281,19 @@ end)
 
 -- mover: glide the anchored root along the path by CFrame every frame
 RunService.Heartbeat:Connect(function(dt)
+	local humanMonster = humanBlindOne()
+	if spawnReady then
+		if humanMonster and monster.Parent then
+			monster.Parent = nil
+		elseif not humanMonster and not monster.Parent then
+			monster.Parent = workspace
+			waypoints = {}
+			wpIndex = 1
+		end
+	end
+	if humanMonster then
+		return
+	end
 	if not monster.Parent or humanoid.Health <= 0 then
 		return
 	end
@@ -299,18 +340,37 @@ end)
 
 -- catch check + dread broadcast
 RunService.Heartbeat:Connect(function()
-	if not monster.Parent then
+	local humanMonster = humanBlindOne()
+	local humanCharacter = humanMonster and humanMonster.Character
+	local humanRoot = humanCharacter and humanCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local humanHumanoid = humanCharacter and humanCharacter:FindFirstChildOfClass("Humanoid")
+	if humanMonster then
+		Remotes.Dread:FireClient(humanMonster, 0)
+	end
+	if humanMonster and (not humanRoot or not humanHumanoid or humanHumanoid.Health <= 0) then
+		for _, player in Players:GetPlayers() do
+			if player ~= humanMonster then
+				Remotes.Dread:FireClient(player, 0)
+			end
+		end
+		return
+	end
+	if not humanMonster and not monster.Parent then
 		return
 	end
 	for _, player in Players:GetPlayers() do
+		if player == humanMonster or player:GetAttribute("Role") == "BlindOne" then
+			continue
+		end
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
 		if hrp and hum and hum.Health > 0 then
-			local d = (hrp.Position - root.Position).Magnitude
+			local sourcePosition = if humanRoot then humanRoot.Position else root.Position
+			local d = (hrp.Position - sourcePosition).Magnitude
 			local graced = os.clock() - (spawnedAt[player] or 0) < Config.SpawnGrace
 			if d < Config.MonsterCatchDistance and not graced then
-				catchBindable:Fire(player)
+				catchBindable:Fire(player, humanMonster ~= nil)
 			end
 			Remotes.Dread:FireClient(player, math.clamp(1 - d / 45, 0, 1))
 		end

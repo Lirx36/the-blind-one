@@ -181,9 +181,9 @@ spawnPad.Name = "Spawn"
 spawnPad.Anchored = true
 spawnPad.Size = Vector3.new(10, 1, 10)
 spawnPad.Position = roomCenter(0, 0) + Vector3.new(0, 0.5, 0)
-spawnPad.Color = Color3.fromRGB(60, 90, 150)
-spawnPad.Material = Enum.Material.Neon
-spawnPad.Transparency = 0.5
+spawnPad.Transparency = 1
+spawnPad.CastShadow = false
+spawnPad.CanQuery = false
 spawnPad.Duration = 0 -- no ForceField bubble on spawn
 spawnPad.Parent = map
 

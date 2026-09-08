@@ -3,7 +3,6 @@
 -- you're in so the noise system knows how loud you are.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,31 +14,6 @@ local ClientState = (csModule and require(csModule)) or { stamina = 1 }
 
 local player = Players.LocalPlayer
 
--- kill Roblox's Shift-Lock so Left Shift is free for sprinting
-player.DevEnableMouseLock = false
-
--- BIG obvious debug panel
-local dbgGui = Instance.new("ScreenGui")
-dbgGui.Name = "MoveDebug"
-dbgGui.ResetOnSpawn = false
-dbgGui.IgnoreGuiInset = true
-dbgGui.Parent = player:WaitForChild("PlayerGui")
-local dbg = Instance.new("TextLabel")
-dbg.AnchorPoint = Vector2.new(0.5, 0.5)
-dbg.Size = UDim2.fromOffset(620, 160)
-dbg.Position = UDim2.fromScale(0.5, 0.5) -- dead centre of the screen
-dbg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-dbg.BackgroundTransparency = 0.25
-dbg.Font = Enum.Font.Code
-dbg.TextSize = 20
-dbg.TextXAlignment = Enum.TextXAlignment.Center
-dbg.TextYAlignment = Enum.TextYAlignment.Center
-dbg.TextColor3 = Color3.fromRGB(120, 255, 140)
-dbg.ZIndex = 50
-dbg.Text = "MoveController: starting..."
-dbg.Parent = dbgGui
-
-local wantSprint = false
 local crouched = false
 local stamina = Config.StaminaMax
 local exhausted = false
@@ -50,31 +24,50 @@ local function humanoid(): Humanoid?
 	return char and char:FindFirstChildOfClass("Humanoid") or nil
 end
 
--- Sprint via ContextActionService: fires even though Left Shift is a reserved engine key
-ContextActionService:BindAction("Sprint", function(_, inputState)
-	wantSprint = inputState == Enum.UserInputState.Begin
-	if wantSprint then
-		crouched = false
+-- Poll held input instead of relying on one-time input callbacks. This cannot get
+-- stuck if focus changes while Shift is held.
+local function wantsToSprint(): boolean
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+		return true
 	end
-	return Enum.ContextActionResult.Pass
-end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
+	return UserInputService.GamepadEnabled
+		and UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonL3)
+end
 
--- Crouch toggle
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then
-		return
+-- Poll crouch just like sprint so releasing Ctrl always stands the player up,
+-- even if Studio or the camera consumed one of the input events.
+local function wantsToCrouch(): boolean
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+		return true
 	end
-	if input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonB then
-		crouched = not crouched
-	end
-end)
+	return UserInputService.GamepadEnabled
+		and UserInputService:IsGamepadButtonDown(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonB)
+end
 
-RunService.Heartbeat:Connect(function(dt)
+-- Set WalkSpeed before the physics step that consumes it. The server mirrors this
+-- validated state as well, which keeps movement working with server authority on.
+RunService.PreSimulation:Connect(function(dt)
 	local hum = humanoid()
 	if not hum or hum.Health <= 0 then
 		return
 	end
+	if player:GetAttribute("Role") == "BlindOne" then
+		crouched = false
+		stamina = Config.StaminaMax
+		exhausted = false
+		hum.WalkSpeed = Config.PlayerBlindOneSpeed
+		player:SetAttribute("Crouched", false)
+		ClientState.stamina = 1
+		ClientState.move = "monster"
+		ClientState.walkSpeed = Config.PlayerBlindOneSpeed
+		sentState = "monster"
+		return
+	end
 
+	local wantSprint = wantsToSprint()
+	crouched = wantsToCrouch() and not wantSprint
 	local moving = hum.MoveDirection.Magnitude > 0.1
 	local sprinting = wantSprint and moving and not crouched and not exhausted
 
@@ -107,16 +100,8 @@ RunService.Heartbeat:Connect(function(dt)
 	ClientState.move = state
 	ClientState.walkSpeed = speed
 
-	dbg.Text = string.format(
-		"MoveController RUNNING\nwantSprint=%s  moving=%s  crouched=%s  exhausted=%s\nstate=%s  speed set=%d\nhum.WalkSpeed NOW=%.1f   stamina=%.1f",
-		tostring(wantSprint), tostring(moving), tostring(crouched), tostring(exhausted),
-		state, speed, hum.WalkSpeed, stamina
-	)
-
 	if state ~= sentState then
 		sentState = state
 		Remotes.SetMoveState:FireServer(state)
 	end
 end)
-
-print("[MoveController] running")

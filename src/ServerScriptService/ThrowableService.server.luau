@@ -42,6 +42,9 @@ local function makeRock(pos: Vector3): BasePart
 end
 
 Remotes.Pickup.OnServerEvent:Connect(function(player, rock)
+	if player:GetAttribute("Role") == "BlindOne" then
+		return
+	end
 	if typeof(rock) ~= "Instance" or not rock:IsA("BasePart") or not rock:HasTag("Throwable") then
 		return
 	end
@@ -55,6 +58,9 @@ Remotes.Pickup.OnServerEvent:Connect(function(player, rock)
 end)
 
 Remotes.Throw.OnServerEvent:Connect(function(player, direction)
+	if player:GetAttribute("Role") == "BlindOne" then
+		return
+	end
 	if typeof(direction) ~= "Vector3" or (held[player] or 0) <= 0 then
 		return
 	end

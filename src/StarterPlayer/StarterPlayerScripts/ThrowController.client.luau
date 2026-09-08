@@ -34,7 +34,7 @@ local function nearestRock(): BasePart?
 end
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then
+	if gpe or player:GetAttribute("Role") == "BlindOne" then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
