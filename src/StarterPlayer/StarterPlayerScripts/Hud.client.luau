@@ -6,8 +6,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local ClientState = require(ReplicatedStorage:WaitForChild("ClientState"))
 
 local player = Players.LocalPlayer
 local gui = Instance.new("ScreenGui")
@@ -119,10 +119,9 @@ RunService.RenderStepped:Connect(function()
 	noiseFill.Size = UDim2.fromScale(nr, 1)
 	noiseFill.BackgroundColor3 = Color3.fromRGB(120, 200, 140):Lerp(Color3.fromRGB(230, 70, 70), nr)
 
-	local stam = player:GetAttribute("Stamina")
-	local sr = typeof(stam) == "number" and math.clamp(stam / Config.StaminaMax, 0, 1) or 1
+	local sr = math.clamp(ClientState.stamina, 0, 1)
 	stamFill.Size = UDim2.fromScale(sr, 1)
-	stamFill.BackgroundColor3 = Color3.fromRGB(90, 150, 230)
+	stamFill.BackgroundColor3 = sr < 0.25 and Color3.fromRGB(230, 120, 90) or Color3.fromRGB(90, 150, 230)
 
 	-- dread overlay: base darkness + pulse
 	local pulse = dread > 0.15 and (math.sin(os.clock() * (6 + dread * 10)) * 0.5 + 0.5) * dread * 0.3 or 0

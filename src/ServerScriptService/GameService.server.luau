@@ -27,9 +27,13 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	player:SetAttribute("HasKey", false)
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(char)
 		player:SetAttribute("HasKey", false)
 		caughtDebounce[player] = nil
+		local ff = char:FindFirstChildOfClass("ForceField")
+		if ff then
+			ff:Destroy()
+		end
 		task.wait(0.5)
 		setObjective(player, START_OBJECTIVE)
 	end)

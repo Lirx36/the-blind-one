@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local ClientState = require(ReplicatedStorage:WaitForChild("ClientState"))
 
 local player = Players.LocalPlayer
 
@@ -58,7 +59,7 @@ RunService.Heartbeat:Connect(function(dt)
 			exhausted = false
 		end
 	end
-	player:SetAttribute("Stamina", stamina)
+	ClientState.stamina = math.clamp(stamina / Config.StaminaMax, 0, 1)
 
 	local state, speed
 	if sprinting then
