@@ -31,6 +31,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
 		wantSprint = true
+		crouched = false -- sprinting always overrides a stuck crouch toggle
 	elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonB then
 		crouched = not crouched
 	end
@@ -76,9 +77,13 @@ RunService.Heartbeat:Connect(function(dt)
 
 	hum.WalkSpeed = speed
 	player:SetAttribute("Crouched", crouched)
+	ClientState.move = state
+	ClientState.walkSpeed = speed
 
 	if state ~= sentState then
 		sentState = state
 		Remotes.SetMoveState:FireServer(state)
 	end
 end)
+
+print("[MoveController] running")
