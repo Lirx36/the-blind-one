@@ -1,8 +1,9 @@
 --!strict
--- Walk / crouch / sprint. Sets local WalkSpeed and tells the server which state you're
--- in so the noise system knows how loud you are.
+-- Walk / crouch / sprint. Sets local WalkSpeed and tells the server which state
+-- you're in so the noise system knows how loud you are.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -13,6 +14,9 @@ local csModule = ReplicatedStorage:WaitForChild("ClientState", 5)
 local ClientState = (csModule and require(csModule)) or { stamina = 1 }
 
 local player = Players.LocalPlayer
+
+-- kill Roblox's Shift-Lock so Left Shift is free for sprinting
+player.DevEnableMouseLock = false
 
 local wantSprint = false
 local crouched = false
@@ -25,20 +29,22 @@ local function humanoid(): Humanoid?
 	return char and char:FindFirstChildOfClass("Humanoid") or nil
 end
 
+-- Sprint via ContextActionService: fires even though Left Shift is a reserved engine key
+ContextActionService:BindAction("Sprint", function(_, inputState)
+	wantSprint = inputState == Enum.UserInputState.Begin
+	if wantSprint then
+		crouched = false
+	end
+	return Enum.ContextActionResult.Pass
+end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
+
+-- Crouch toggle
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if gpe then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-		wantSprint = true
-		crouched = false -- sprinting always overrides a stuck crouch toggle
-	elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonB then
+	if input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonB then
 		crouched = not crouched
-	end
-end)
-UserInputService.InputEnded:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-		wantSprint = false
 	end
 end)
 
