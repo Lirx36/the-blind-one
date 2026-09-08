@@ -18,6 +18,25 @@ local player = Players.LocalPlayer
 -- kill Roblox's Shift-Lock so Left Shift is free for sprinting
 player.DevEnableMouseLock = false
 
+-- BIG obvious debug panel
+local dbgGui = Instance.new("ScreenGui")
+dbgGui.Name = "MoveDebug"
+dbgGui.ResetOnSpawn = false
+dbgGui.IgnoreGuiInset = true
+dbgGui.Parent = player:WaitForChild("PlayerGui")
+local dbg = Instance.new("TextLabel")
+dbg.Size = UDim2.fromOffset(520, 120)
+dbg.Position = UDim2.fromOffset(12, 40)
+dbg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+dbg.BackgroundTransparency = 0.35
+dbg.Font = Enum.Font.Code
+dbg.TextSize = 18
+dbg.TextXAlignment = Enum.TextXAlignment.Left
+dbg.TextYAlignment = Enum.TextYAlignment.Top
+dbg.TextColor3 = Color3.fromRGB(120, 255, 140)
+dbg.Text = "MoveController: starting..."
+dbg.Parent = dbgGui
+
 local wantSprint = false
 local crouched = false
 local stamina = Config.StaminaMax
@@ -85,6 +104,12 @@ RunService.Heartbeat:Connect(function(dt)
 	player:SetAttribute("Crouched", crouched)
 	ClientState.move = state
 	ClientState.walkSpeed = speed
+
+	dbg.Text = string.format(
+		"MoveController RUNNING\nwantSprint=%s  moving=%s  crouched=%s  exhausted=%s\nstate=%s  speed set=%d\nhum.WalkSpeed NOW=%.1f   stamina=%.1f",
+		tostring(wantSprint), tostring(moving), tostring(crouched), tostring(exhausted),
+		state, speed, hum.WalkSpeed, stamina
+	)
 
 	if state ~= sentState then
 		sentState = state
