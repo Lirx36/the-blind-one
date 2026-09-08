@@ -24,11 +24,14 @@ local AGENT = {
 local monster = Instance.new("Model")
 monster.Name = "TheBlindOne"
 
+local ROOT_Y = 3.9 -- centre height so the figure's feet sit near the floor (floor top = 0)
+
 local root = Instance.new("Part")
 root.Name = "HumanoidRootPart"
 root.Size = Vector3.new(2.4, 7, 1.6)
-root.Transparency = 1 -- invisible physics box; the figure below is cosmetic
-root.CanCollide = true
+root.Transparency = 1 -- invisible; the figure below is cosmetic
+root.CanCollide = false
+root.Anchored = true -- moved directly by CFrame, no ragdoll physics / replication stutter
 root.Parent = monster
 monster.PrimaryPart = root
 
@@ -41,14 +44,10 @@ local function limb(name: string, size: Vector3, offset: CFrame, color: Color3, 
 	p.Color = color
 	p.Material = material
 	p.CanCollide = false
-	p.Massless = true
+	p.Anchored = true -- whole model is moved rigidly with monster:PivotTo()
 	p.CastShadow = true
 	p.Parent = monster
 	p.CFrame = root.CFrame * offset
-	local w = Instance.new("WeldConstraint")
-	w.Part0 = root
-	w.Part1 = p
-	w.Parent = p
 end
 
 -- tall, gaunt, slightly hunched silhouette
@@ -63,10 +62,10 @@ limb("EyeR", Vector3.new(0.26, 0.14, 0.14), CFrame.new(0.26, 2.9, -0.9), Color3.
 
 local humanoid = Instance.new("Humanoid")
 humanoid.Name = "Humanoid"
-humanoid.HipHeight = 4.2
-humanoid.WalkSpeed = Config.MonsterWanderSpeed
-humanoid.AutoRotate = true
+humanoid.WalkSpeed = 0 -- movement is done by CFrame; the Humanoid is just for Health/death
+humanoid.AutoRotate = false
 humanoid.BreakJointsOnDeath = false
+humanoid.EvaluateStateMachine = false
 humanoid.Parent = monster
 
 ------------------------------------------------------------------- patrol points
@@ -98,7 +97,7 @@ local function spawnMonster()
 		end
 	end
 	monster.Parent = workspace
-	root.CFrame = CFrame.new(start + Vector3.new(0, 4, 0))
+	monster:PivotTo(CFrame.new(Vector3.new(start.X, ROOT_Y, start.Z)))
 end
 
 ------------------------------------------------------------------- hearing model
@@ -128,6 +127,8 @@ end)
 local state = "wander" -- "wander" | "investigate" | "hunt"
 local wanderGoal: Vector3? = nil
 local lastHuntHeard = 0
+local targetSpeed = Config.MonsterWanderSpeed
+local currentSpeed = Config.MonsterWanderSpeed
 
 local function nearestNode(from: Vector3): Vector3
 	if #patrolNodes == 0 then
@@ -184,11 +185,11 @@ local function decide()
 	end
 
 	if state == "hunt" or state == "investigate" then
-		humanoid.WalkSpeed = (state == "hunt") and Config.MonsterHuntSpeed or Config.MonsterInvestigateSpeed
+		targetSpeed = (state == "hunt") and Config.MonsterHuntSpeed or Config.MonsterInvestigateSpeed
 		return heard and heard.pos or root.Position
 	end
 
-	humanoid.WalkSpeed = Config.MonsterWanderSpeed
+	targetSpeed = Config.MonsterWanderSpeed
 	if not wanderGoal or (root.Position - wanderGoal).Magnitude < 8 then
 		wanderGoal = nearestNode(root.Position)
 	end
@@ -238,8 +239,8 @@ task.spawn(function()
 	end
 end)
 
--- mover: re-issue MoveTo every frame toward the current waypoint (smooth)
-RunService.Heartbeat:Connect(function()
+-- mover: glide the anchored root along the path by CFrame every frame
+RunService.Heartbeat:Connect(function(dt)
 	if not monster.Parent or humanoid.Health <= 0 then
 		return
 	end
@@ -247,11 +248,23 @@ RunService.Heartbeat:Connect(function()
 	if not wp then
 		return
 	end
-	humanoid:MoveTo(wp.Position)
-	local flat = Vector3.new(root.Position.X - wp.Position.X, 0, root.Position.Z - wp.Position.Z)
-	if flat.Magnitude < 3.5 then
+
+	currentSpeed += (targetSpeed - currentSpeed) * math.clamp(dt * 4, 0, 1)
+
+	local target = Vector3.new(wp.Position.X, ROOT_Y, wp.Position.Z)
+	local toTarget = target - root.Position
+	local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
+
+	if flat.Magnitude < 2.5 then
 		wpIndex += 1
+		return
 	end
+
+	local dir = flat.Unit
+	local newPos = root.Position + dir * math.min(currentSpeed * dt, flat.Magnitude)
+	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
+	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))
+	monster:PivotTo(CFrame.new(newPos) * easedRot)
 end)
 
 -- catch check + dread broadcast

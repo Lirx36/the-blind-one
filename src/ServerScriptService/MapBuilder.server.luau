@@ -44,16 +44,17 @@ local function roomCenter(i: number, j: number): Vector3
 end
 
 ------------------------------------------------------------------- dark lighting
+Lighting.Technology = Enum.Technology.Future -- smooth per-pixel light; kills the voxel "popping"
 Lighting.ClockTime = 0
 Lighting.Brightness = 1
-Lighting.Ambient = Color3.fromRGB(11, 11, 15)
-Lighting.OutdoorAmbient = Color3.fromRGB(8, 8, 12)
-Lighting.EnvironmentDiffuseScale = 0
-Lighting.EnvironmentSpecularScale = 0
+Lighting.Ambient = Color3.fromRGB(18, 18, 24) -- floor of darkness; horror-dark but not pitch black
+Lighting.OutdoorAmbient = Color3.fromRGB(10, 10, 16)
+Lighting.EnvironmentDiffuseScale = 0.2
+Lighting.EnvironmentSpecularScale = 0.1
 Lighting.GlobalShadows = true
 Lighting.FogColor = Color3.fromRGB(0, 0, 0)
-Lighting.FogStart = 20
-Lighting.FogEnd = 130
+Lighting.FogStart = 24
+Lighting.FogEnd = 150
 
 ------------------------------------------------------------------- floor + ceiling
 for i = 0, GRID - 1 do
@@ -212,8 +213,8 @@ for i = 0, GRID - 1 do
 				Material = Enum.Material.Metal,
 			})
 			local bulb = Instance.new("PointLight")
-			bulb.Brightness = 0.85
-			bulb.Range = 24
+			bulb.Brightness = 1.3
+			bulb.Range = 30
 			bulb.Color = Color3.fromRGB(255, 214, 170)
 			bulb.Shadows = true
 			bulb.Parent = fixture
@@ -225,13 +226,13 @@ end
 -- one random bulb stutters briefly every few seconds -- atmospheric, not a strobe
 task.spawn(function()
 	while map.Parent and #bulbs > 0 do
-		task.wait(math.random() * 4 + 3)
+		task.wait(math.random() * 5 + 4)
 		local b = bulbs[math.random(#bulbs)]
 		for _ = 1, math.random(2, 5) do
-			b.Brightness = 0.85 * (math.random() * 0.5 + 0.25)
+			b.Brightness = 1.3 * (math.random() * 0.55 + 0.3)
 			task.wait(0.06)
 		end
-		b.Brightness = 0.85
+		b.Brightness = 1.3
 	end
 end)
 
