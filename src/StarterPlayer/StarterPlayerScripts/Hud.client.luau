@@ -7,7 +7,9 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
-local ClientState = require(ReplicatedStorage:WaitForChild("ClientState"))
+
+local csModule = ReplicatedStorage:WaitForChild("ClientState", 5)
+local ClientState = (csModule and require(csModule)) or { stamina = 1 }
 
 local player = Players.LocalPlayer
 local gui = Instance.new("ScreenGui")
@@ -16,7 +18,10 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- replace the mouse cursor with a small centre dot
+-- hide the backpack UI (the lantern is a forced tool) and the mouse cursor
+pcall(function()
+	game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+end)
 UserInputService.MouseIconEnabled = false
 local dot = Instance.new("Frame")
 dot.Name = "Crosshair"

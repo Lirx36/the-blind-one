@@ -8,7 +8,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
-local ClientState = require(ReplicatedStorage:WaitForChild("ClientState"))
+
+local csModule = ReplicatedStorage:WaitForChild("ClientState", 5)
+local ClientState = (csModule and require(csModule)) or { stamina = 1 }
 
 local player = Players.LocalPlayer
 
