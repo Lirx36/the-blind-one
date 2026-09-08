@@ -18,10 +18,10 @@ local function attachLantern(char: Model)
 	end
 	local lantern = Instance.new("PointLight")
 	lantern.Name = "Lantern"
-	lantern.Range = 30
-	lantern.Brightness = 2.4
+	lantern.Range = 34
+	lantern.Brightness = 2.6
 	lantern.Color = Color3.fromRGB(255, 224, 188)
-	lantern.Shadows = true
+	lantern.Shadows = false -- smooth pool of light, no flickering shadow edges
 	lantern.Parent = hrp
 end
 if player.Character then
@@ -40,10 +40,10 @@ emitter.Transparency = 1
 emitter.Parent = Workspace
 
 local beam = Instance.new("SpotLight")
-beam.Angle = 55
-beam.Range = 75
-beam.Brightness = 2.6
-beam.Shadows = true
+beam.Angle = 60
+beam.Range = 80
+beam.Brightness = 2.4
+beam.Shadows = false -- SpotLight shadows are the flickery kind; keep the beam clean
 beam.Color = Color3.fromRGB(245, 245, 225)
 beam.Face = Enum.NormalId.Front
 beam.Parent = emitter

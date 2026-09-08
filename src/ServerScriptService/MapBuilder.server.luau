@@ -50,15 +50,15 @@ pcall(function()
 	(Lighting :: any).Technology = Enum.Technology.Future
 end)
 Lighting.ClockTime = 0
-Lighting.Brightness = 1
-Lighting.Ambient = Color3.fromRGB(18, 18, 24) -- floor of darkness; horror-dark but not pitch black
-Lighting.OutdoorAmbient = Color3.fromRGB(10, 10, 16)
-Lighting.EnvironmentDiffuseScale = 0.2
+Lighting.Brightness = 2
+Lighting.Ambient = Color3.fromRGB(30, 30, 38) -- lifted so unlit areas aren't a black void that "pops"
+Lighting.OutdoorAmbient = Color3.fromRGB(16, 16, 24)
+Lighting.EnvironmentDiffuseScale = 0.3
 Lighting.EnvironmentSpecularScale = 0.1
 Lighting.GlobalShadows = true
-Lighting.FogColor = Color3.fromRGB(0, 0, 0)
-Lighting.FogStart = 24
-Lighting.FogEnd = 150
+Lighting.FogColor = Color3.fromRGB(2, 2, 4)
+Lighting.FogStart = 30
+Lighting.FogEnd = 170
 
 ------------------------------------------------------------------- floor + ceiling
 for i = 0, GRID - 1 do
@@ -217,10 +217,10 @@ for i = 0, GRID - 1 do
 				Material = Enum.Material.Metal,
 			})
 			local bulb = Instance.new("PointLight")
-			bulb.Brightness = 1.3
-			bulb.Range = 30
+			bulb.Brightness = 1.6
+			bulb.Range = 34
 			bulb.Color = Color3.fromRGB(255, 214, 170)
-			bulb.Shadows = true
+			bulb.Shadows = false -- shadow-swing from these was half the "popping"
 			bulb.Parent = fixture
 			table.insert(bulbs, bulb)
 		end
