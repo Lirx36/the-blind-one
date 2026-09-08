@@ -26,34 +26,44 @@ monster.Name = "TheBlindOne"
 
 local root = Instance.new("Part")
 root.Name = "HumanoidRootPart"
-root.Size = Vector3.new(3, 7, 2)
-root.Color = Color3.fromRGB(18, 18, 22)
-root.Material = Enum.Material.Slate
-root.Transparency = 0.05
+root.Size = Vector3.new(2.4, 7, 1.6)
+root.Transparency = 1 -- invisible physics box; the figure below is cosmetic
 root.CanCollide = true
 root.Parent = monster
 monster.PrimaryPart = root
 
-for _, side in { -1, 1 } do
-	local eye = Instance.new("Part")
-	eye.Name = "Eye"
-	eye.Shape = Enum.PartType.Ball
-	eye.Size = Vector3.new(0.5, 0.5, 0.5)
-	eye.Color = Color3.fromRGB(220, 235, 255)
-	eye.Material = Enum.Material.Neon
-	eye.CanCollide = false
-	eye.Massless = true
-	eye.Parent = monster
-	eye.CFrame = root.CFrame * CFrame.new(side * 0.7, 2.6, -1.05)
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = root
-	weld.Part1 = eye
-	weld.Parent = eye
+local DARK = Color3.fromRGB(13, 13, 17)
+
+local function limb(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Color = color
+	p.Material = material
+	p.CanCollide = false
+	p.Massless = true
+	p.CastShadow = true
+	p.Parent = monster
+	p.CFrame = root.CFrame * offset
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = root
+	w.Part1 = p
+	w.Parent = p
 end
+
+-- tall, gaunt, slightly hunched silhouette
+limb("Torso", Vector3.new(1.9, 3.4, 1.0), CFrame.new(0, 0.7, 0) * CFrame.Angles(math.rad(12), 0, 0), DARK, Enum.Material.Slate)
+limb("Head", Vector3.new(1.05, 1.3, 1.05), CFrame.new(0, 2.8, -0.35), DARK, Enum.Material.Slate)
+limb("ArmL", Vector3.new(0.5, 3.7, 0.5), CFrame.new(-1.25, -0.1, 0.1) * CFrame.Angles(math.rad(6), 0, math.rad(6)), DARK, Enum.Material.Slate)
+limb("ArmR", Vector3.new(0.5, 3.7, 0.5), CFrame.new(1.25, -0.1, 0.1) * CFrame.Angles(math.rad(6), 0, math.rad(-6)), DARK, Enum.Material.Slate)
+limb("LegL", Vector3.new(0.6, 3.2, 0.6), CFrame.new(-0.5, -2.9, 0), DARK, Enum.Material.Slate)
+limb("LegR", Vector3.new(0.6, 3.2, 0.6), CFrame.new(0.5, -2.9, 0), DARK, Enum.Material.Slate)
+limb("EyeL", Vector3.new(0.26, 0.14, 0.14), CFrame.new(-0.26, 2.9, -0.9), Color3.fromRGB(225, 240, 255), Enum.Material.Neon)
+limb("EyeR", Vector3.new(0.26, 0.14, 0.14), CFrame.new(0.26, 2.9, -0.9), Color3.fromRGB(225, 240, 255), Enum.Material.Neon)
 
 local humanoid = Instance.new("Humanoid")
 humanoid.Name = "Humanoid"
-humanoid.HipHeight = 3.6
+humanoid.HipHeight = 4.2
 humanoid.WalkSpeed = Config.MonsterWanderSpeed
 humanoid.AutoRotate = true
 humanoid.BreakJointsOnDeath = false
@@ -185,26 +195,31 @@ local function decide()
 	return wanderGoal or root.Position
 end
 
-local function stepToward(goal: Vector3)
-	local path = PathfindingService:CreatePath(AGENT)
+------------------------------------------------------------------- locomotion
+local waypoints: { PathWaypoint } = {}
+local wpIndex = 1
+local lastCompute = 0
+local currentGoal = Vector3.zero
+local pathObj = PathfindingService:CreatePath(AGENT)
+
+local function recompute(goal: Vector3)
+	lastCompute = os.clock()
+	currentGoal = goal
 	local ok = pcall(function()
-		path:ComputeAsync(root.Position, goal)
+		pathObj:ComputeAsync(root.Position, goal)
 	end)
-	if ok and path.Status == Enum.PathStatus.Success then
-		local wps = path:GetWaypoints()
-		local nextPoint = wps[math.min(2, #wps)]
-		if nextPoint then
-			humanoid:MoveTo(nextPoint.Position)
-			return
-		end
+	if ok and pathObj.Status == Enum.PathStatus.Success then
+		waypoints = pathObj:GetWaypoints()
+		wpIndex = 2 -- waypoint 1 is our own position
+	else
+		waypoints = {}
 	end
-	-- no path: shuffle straight at it, physics will slide us along walls
-	humanoid:MoveTo(root.Position + (goal - root.Position).Unit * 6)
 end
 
 task.wait(1.5) -- let MapBuilder finish placing nodes
 spawnMonster()
 
+-- decision loop: choose a goal, refresh the path only when it's stale
 task.spawn(function()
 	while true do
 		if monster.Parent and humanoid.Health > 0 then
@@ -213,9 +228,29 @@ task.spawn(function()
 			end
 			pollPlayers()
 			local goal = decide()
-			stepToward(goal)
+			local maxAge = (state == "hunt") and 0.4 or 0.9
+			local moved = (goal - currentGoal).Magnitude > 6
+			if moved or os.clock() - lastCompute > maxAge or #waypoints == 0 or wpIndex > #waypoints then
+				recompute(goal)
+			end
 		end
-		task.wait(Config.MonsterRepath)
+		task.wait(0.15)
+	end
+end)
+
+-- mover: re-issue MoveTo every frame toward the current waypoint (smooth)
+RunService.Heartbeat:Connect(function()
+	if not monster.Parent or humanoid.Health <= 0 then
+		return
+	end
+	local wp = waypoints[wpIndex]
+	if not wp then
+		return
+	end
+	humanoid:MoveTo(wp.Position)
+	local flat = Vector3.new(root.Position.X - wp.Position.X, 0, root.Position.Z - wp.Position.Z)
+	if flat.Magnitude < 3.5 then
+		wpIndex += 1
 	end
 end)
 

@@ -45,15 +45,15 @@ end
 
 ------------------------------------------------------------------- dark lighting
 Lighting.ClockTime = 0
-Lighting.Brightness = 0
-Lighting.Ambient = Color3.fromRGB(4, 4, 6)
-Lighting.OutdoorAmbient = Color3.fromRGB(6, 6, 10)
+Lighting.Brightness = 1
+Lighting.Ambient = Color3.fromRGB(11, 11, 15)
+Lighting.OutdoorAmbient = Color3.fromRGB(8, 8, 12)
 Lighting.EnvironmentDiffuseScale = 0
 Lighting.EnvironmentSpecularScale = 0
 Lighting.GlobalShadows = true
 Lighting.FogColor = Color3.fromRGB(0, 0, 0)
-Lighting.FogStart = 10
-Lighting.FogEnd = 95
+Lighting.FogStart = 20
+Lighting.FogEnd = 130
 
 ------------------------------------------------------------------- floor + ceiling
 for i = 0, GRID - 1 do
@@ -200,6 +200,7 @@ end
 
 ------------------------------------------------------------------- dim lights + flicker
 math.randomseed(7)
+local bulbs: { PointLight } = {}
 for i = 0, GRID - 1 do
 	for j = 0, GRID - 1 do
 		if (i + j) % 2 == 0 then
@@ -211,22 +212,28 @@ for i = 0, GRID - 1 do
 				Material = Enum.Material.Metal,
 			})
 			local bulb = Instance.new("PointLight")
-			bulb.Brightness = 0.7
-			bulb.Range = 26
-			bulb.Color = Color3.fromRGB(255, 210, 160)
+			bulb.Brightness = 0.85
+			bulb.Range = 24
+			bulb.Color = Color3.fromRGB(255, 214, 170)
 			bulb.Shadows = true
 			bulb.Parent = fixture
-			if math.random() < 0.4 then
-				task.spawn(function()
-					while fixture.Parent do
-						bulb.Enabled = math.random() > 0.15
-						task.wait(math.random() * 0.25 + 0.05)
-					end
-				end)
-			end
+			table.insert(bulbs, bulb)
 		end
 	end
 end
+
+-- one random bulb stutters briefly every few seconds -- atmospheric, not a strobe
+task.spawn(function()
+	while map.Parent and #bulbs > 0 do
+		task.wait(math.random() * 4 + 3)
+		local b = bulbs[math.random(#bulbs)]
+		for _ = 1, math.random(2, 5) do
+			b.Brightness = 0.85 * (math.random() * 0.5 + 0.25)
+			task.wait(0.06)
+		end
+		b.Brightness = 0.85
+	end
+end)
 
 ------------------------------------------------------------------- scattered rocks
 for _ = 1, 5 do
