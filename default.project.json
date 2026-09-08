@@ -2,6 +2,12 @@
   "name": "the-blind-one",
   "tree": {
     "$className": "DataModel",
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Future"
+      }
+    },
     "ReplicatedStorage": {
       "$path": "src/ReplicatedStorage"
     },
