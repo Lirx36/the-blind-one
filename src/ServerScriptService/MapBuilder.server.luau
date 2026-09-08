@@ -50,15 +50,15 @@ pcall(function()
 	(Lighting :: any).Technology = Enum.Technology.Future
 end)
 Lighting.ClockTime = 0
-Lighting.Brightness = 2
-Lighting.Ambient = Color3.fromRGB(30, 30, 38) -- lifted so unlit areas aren't a black void that "pops"
-Lighting.OutdoorAmbient = Color3.fromRGB(16, 16, 24)
-Lighting.EnvironmentDiffuseScale = 0 -- no skybox light leaking indoors
+Lighting.Brightness = 0.6
+Lighting.Ambient = Color3.fromRGB(9, 9, 12) -- very dark; you rely on your lantern
+Lighting.OutdoorAmbient = Color3.fromRGB(5, 5, 8)
+Lighting.EnvironmentDiffuseScale = 0
 Lighting.EnvironmentSpecularScale = 0
 Lighting.GlobalShadows = true
-Lighting.FogColor = Color3.fromRGB(2, 2, 4)
-Lighting.FogStart = 30
-Lighting.FogEnd = 170
+Lighting.FogColor = Color3.fromRGB(0, 0, 0)
+Lighting.FogStart = 12
+Lighting.FogEnd = 70
 
 -- kill the view-dependent post effects that make the whole scene brighten/darken
 -- as you turn the camera (atmospheric scattering, god-rays, bloom, DoF)
@@ -229,10 +229,10 @@ for i = 0, GRID - 1 do
 				Material = Enum.Material.Metal,
 			})
 			local bulb = Instance.new("PointLight")
-			bulb.Brightness = 1.6
-			bulb.Range = 34
-			bulb.Color = Color3.fromRGB(255, 214, 170)
-			bulb.Shadows = false -- shadow-swing from these was half the "popping"
+			bulb.Brightness = 0.6
+			bulb.Range = 18
+			bulb.Color = Color3.fromRGB(255, 206, 156)
+			bulb.Shadows = false
 			bulb.Parent = fixture
 			table.insert(bulbs, bulb)
 		end
@@ -245,10 +245,10 @@ task.spawn(function()
 		task.wait(math.random() * 5 + 4)
 		local b = bulbs[math.random(#bulbs)]
 		for _ = 1, math.random(2, 5) do
-			b.Brightness = 1.3 * (math.random() * 0.55 + 0.3)
+			b.Brightness = 0.6 * (math.random() * 0.55 + 0.25)
 			task.wait(0.06)
 		end
-		b.Brightness = 1.3
+		b.Brightness = 0.6
 	end
 end)
 
