@@ -18,8 +18,8 @@ local function attachLantern(char: Model)
 	end
 	local lantern = Instance.new("PointLight")
 	lantern.Name = "Lantern"
-	lantern.Range = 16
-	lantern.Brightness = 1.1
+	lantern.Range = 15 -- small, tight pool right around you
+	lantern.Brightness = 2.6
 	lantern.Color = Color3.fromRGB(255, 220, 182)
 	lantern.Shadows = false -- smooth pool of light, no flickering shadow edges
 	lantern.Parent = hrp

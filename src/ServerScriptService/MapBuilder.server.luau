@@ -50,9 +50,9 @@ pcall(function()
 	(Lighting :: any).Technology = Enum.Technology.Future
 end)
 Lighting.ClockTime = 0
-Lighting.Brightness = 0.6
-Lighting.Ambient = Color3.fromRGB(9, 9, 12) -- very dark; you rely on your lantern
-Lighting.OutdoorAmbient = Color3.fromRGB(5, 5, 8)
+Lighting.Brightness = 0.5
+Lighting.Ambient = Color3.fromRGB(12, 12, 16) -- near-black; the lantern is your light
+Lighting.OutdoorAmbient = Color3.fromRGB(6, 6, 9)
 Lighting.EnvironmentDiffuseScale = 0
 Lighting.EnvironmentSpecularScale = 0
 Lighting.GlobalShadows = true

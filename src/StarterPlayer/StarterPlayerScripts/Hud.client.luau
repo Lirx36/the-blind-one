@@ -3,6 +3,7 @@
 -- in as the monster gets near.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
@@ -14,6 +15,22 @@ gui.Name = "BlindHud"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = player:WaitForChild("PlayerGui")
+
+-- replace the mouse cursor with a small centre dot
+UserInputService.MouseIconEnabled = false
+local dot = Instance.new("Frame")
+dot.Name = "Crosshair"
+dot.AnchorPoint = Vector2.new(0.5, 0.5)
+dot.Position = UDim2.fromScale(0.5, 0.5)
+dot.Size = UDim2.fromOffset(5, 5)
+dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+dot.BackgroundTransparency = 0.1
+dot.BorderSizePixel = 0
+dot.ZIndex = 10
+dot.Parent = gui
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius = UDim.new(1, 0)
+dotCorner.Parent = dot
 
 -- dread overlay: darkens the screen as the monster closes in
 local vignette = Instance.new("Frame")
