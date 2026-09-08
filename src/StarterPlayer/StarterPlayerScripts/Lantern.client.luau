@@ -127,8 +127,40 @@ beam.Shadows = false
 beam.Parent = glass
 
 local rightHand: BasePart? = nil
-local currentCFrame: CFrame? = nil
 local lightEnabled = true
+
+local function monsterInLanternBeam(camera: Camera): number
+	local strongest = 0
+	local function sample(candidate: Model?)
+		if not candidate then
+			return
+		end
+		local candidateRoot = candidate:FindFirstChild("HumanoidRootPart")
+		if not candidateRoot or not candidateRoot:IsA("BasePart") then
+			return
+		end
+		local offset = candidateRoot.Position - camera.CFrame.Position
+		local distance = offset.Magnitude
+		if distance < 0.1 or distance > 42 then
+			return
+		end
+		local facing = camera.CFrame.LookVector:Dot(offset.Unit)
+		local centered = math.clamp((facing - 0.42) / 0.5, 0, 1)
+		local close = math.clamp(1 - distance / 42, 0, 1)
+		strongest = math.max(strongest, centered * close)
+	end
+
+	local aiMonster = Workspace:FindFirstChild("TheBlindOne")
+	if aiMonster and aiMonster:IsA("Model") then
+		sample(aiMonster)
+	end
+	for _, otherPlayer in Players:GetPlayers() do
+		if otherPlayer:GetAttribute("Role") == "BlindOne" then
+			sample(otherPlayer.Character)
+		end
+	end
+	return strongest
+end
 
 local function findRightHand(character: Model)
 	local candidate = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
@@ -148,7 +180,6 @@ if player.Character then
 end
 player.CharacterAdded:Connect(function(character)
 	rightHand = nil
-	currentCFrame = nil
 	findRightHand(character)
 end)
 
@@ -169,7 +200,7 @@ end)
 
 applyLightState()
 
-RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value + 2, function(dt)
+RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value + 2, function()
 	if player:GetAttribute("Role") == "BlindOne" then
 		if lantern.Parent then
 			lantern.Parent = nil
@@ -177,13 +208,17 @@ RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value 
 		return
 	elseif not lantern.Parent then
 		lantern.Parent = Workspace
-		currentCFrame = nil
 	end
 	local camera = Workspace.CurrentCamera
 	local hand = rightHand
 	if not camera or not hand or not hand.Parent then
 		return
 	end
+	-- The creature swallows nearby lantern light instead of becoming a bright
+	-- orange showroom model. The rest of the map keeps the full lantern range.
+	local shadowStrength = monsterInLanternBeam(camera)
+	pointLight.Brightness = 3.2 * (1 - shadowStrength * 0.78)
+	beam.Brightness = 5.5 * (1 - shadowStrength * 0.84)
 
 	local horizontalLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
 	if horizontalLook.Magnitude < 0.001 then
@@ -192,13 +227,16 @@ RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value 
 		horizontalLook = horizontalLook.Unit
 	end
 
-	local handCenter = hand.Position - Vector3.new(0, 0.7, 0)
+	local lookDown = math.clamp(-camera.CFrame.LookVector.Y, 0, 1)
+	local hangDistance = 0.7 + 0.35 * lookDown
+	local handCenter = hand.Position - Vector3.new(0, hangDistance, 0)
 	local cameraCenter = (camera.CFrame * CFrame.new(0.72, -0.58, -1.55)).Position
 	local handDepth = (hand.Position - camera.CFrame.Position):Dot(camera.CFrame.LookVector)
 	-- Normally the lantern hangs directly from the hand. If an unusual avatar or
 	-- animation leaves that hand behind the camera, pull it into the expected FPS
 	-- carrying position instead of letting the prop disappear completely.
-	local center = if handDepth > 0.2 then handCenter:Lerp(cameraCenter, 0.45) else cameraCenter
+	local cameraWeight = 0.45 - 0.22 * lookDown
+	local center = if handDepth > 0.2 then handCenter:Lerp(cameraCenter, cameraWeight) else cameraCenter
 	local movement = 0
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -207,11 +245,7 @@ RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value 
 	end
 	local sway = math.rad(math.sin(os.clock() * 7) * 1.5 * movement)
 	local target = CFrame.lookAt(center, center + horizontalLook, Vector3.yAxis) * CFrame.Angles(0, 0, sway)
-
-	if not currentCFrame then
-		currentCFrame = target
-	else
-		currentCFrame = currentCFrame:Lerp(target, 1 - math.exp(-18 * dt))
-	end
-	lantern:PivotTo(currentCFrame :: CFrame)
+	-- Do not smooth world position here. The camera and character already move
+	-- smoothly; easing again creates a visible sideways trail while strafing.
+	lantern:PivotTo(target)
 end)

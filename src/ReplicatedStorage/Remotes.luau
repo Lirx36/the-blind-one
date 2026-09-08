@@ -13,6 +13,7 @@ local NAMES = {
 	"HeldCount", -- server -> client: how many rocks you hold
 	"Objective", -- server -> client: objective text
 	"Jumpscare", -- server -> client: you were caught
+	"PhotoMode", -- Studio testing: client toggles the solo AI freeze
 }
 
 local folder: Folder

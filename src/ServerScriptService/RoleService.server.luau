@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"))
 
 local rng = Random.new()
 
@@ -43,50 +44,11 @@ local function moveMonsterToFarSpawn(player: Player, character: Model)
 end
 
 local function clearMonsterVisual(character: Model)
-	local old = character:FindFirstChild("BlindOneVisual")
-	if old then
-		old:Destroy()
-	end
+	MonsterAppearance.Clear(character)
 end
 
 local function addMonsterVisual(character: Model)
-	clearMonsterVisual(character)
-	local marker = Instance.new("Folder")
-	marker.Name = "BlindOneVisual"
-	marker.Parent = character
-
-	local aura = Instance.new("Highlight")
-	aura.Name = "DarkAura"
-	aura.Adornee = character
-	aura.DepthMode = Enum.HighlightDepthMode.Occluded
-	aura.FillColor = Color3.fromRGB(7, 8, 11)
-	aura.FillTransparency = 0.22
-	aura.OutlineColor = Color3.fromRGB(185, 210, 225)
-	aura.OutlineTransparency = 0.35
-	aura.Parent = marker
-
-	local head = character:FindFirstChild("Head")
-	if not head or not head:IsA("BasePart") then
-		return
-	end
-	for _, x in { -0.2, 0.2 } do
-		local eye = Instance.new("Part")
-		eye.Name = "BlindEye"
-		eye.Size = Vector3.new(0.16, 0.1, 0.08)
-		eye.Color = Color3.fromRGB(220, 235, 245)
-		eye.Material = Enum.Material.Neon
-		eye.Massless = true
-		eye.CanCollide = false
-		eye.CanTouch = false
-		eye.CanQuery = false
-		eye.CastShadow = false
-		eye.CFrame = head.CFrame * CFrame.new(x, 0.08, -(head.Size.Z / 2 + 0.045))
-		eye.Parent = marker
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = head
-		weld.Part1 = eye
-		weld.Parent = eye
-	end
+	MonsterAppearance.Apply(character)
 end
 
 local function styleCharacter(player: Player, character: Model, moveToMonsterSpawn: boolean)
@@ -160,6 +122,13 @@ local function setupPlayer(player: Player)
 	player.CharacterAdded:Connect(function(character)
 		task.wait(0.1)
 		styleCharacter(player, character, player:GetAttribute("Role") == "BlindOne")
+	end)
+	player.CharacterAppearanceLoaded:Connect(function(character)
+		-- Catalog accessories can arrive after CharacterAdded. Reapply once Roblox
+		-- finishes loading them so the personal avatar never leaks through the skin.
+		if player.Character == character and player:GetAttribute("Role") == "BlindOne" then
+			addMonsterVisual(character)
+		end
 	end)
 end
 

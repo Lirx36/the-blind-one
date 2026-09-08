@@ -1,0 +1,20 @@
+THE BLIND ONE — ONE-TIME ROBLOX STUDIO IMPORT
+
+1. Stop the playtest using the red Stop button.
+2. In Roblox Studio, open the Avatar tab and click Import 3D.
+3. Select TheBlindOneRigged.gltf from this folder. Keep the .gltf, .bin, and
+   the_blind_one_two_sided_atlas.png together so Studio finds every dependency.
+4. Leave "Import Only as a Model" ON and the scale at 1. The preview tree must
+   list Head, Torso, LowerTorso, both arms, both legs, hands, and feet. If it
+   only says "default", cancel: that means the old OBJ was selected.
+5. Import it. Keep TheBlindOne.mtl, the_blind_one_concept.png, and the OBJ
+   together in this folder so Studio finds the approved texture automatically.
+6. In Explorer, drag the imported Model into ServerStorage.
+7. Rename that Model exactly: BlindOneRig
+
+That is all. The game script detects BlindOneRig automatically, scales it to
+the correct height, hides the player's Roblox avatar, attaches each monster
+section to the hidden R15 skeleton, and adds the cold-white eye glow plus the
+injured-leg limp. Your old BlindOneMesh can stay in ServerStorage as a backup.
+
+Do not rotate or resize it; the script handles orientation and scale.

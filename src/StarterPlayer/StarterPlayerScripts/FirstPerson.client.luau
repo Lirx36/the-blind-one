@@ -177,11 +177,16 @@ end
 
 local function setLanternArmPose()
 	-- Keep the right arm extended so the hand meets the lantern handle. Both R15
-	-- and classic R6 shoulder names are supported.
-	setJointTransform("RightShoulder", CFrame.Angles(math.rad(112), math.rad(-6), math.rad(10)))
-	setJointTransform("RightElbow", CFrame.Angles(math.rad(-12), 0, math.rad(-3)))
+	-- and classic R6 shoulder names are supported. As the player looks down, lower
+	-- the arm with the camera so it remains above the lantern instead of clipping it.
+	local camera = workspace.CurrentCamera
+	local lookDown = if camera then math.clamp(-camera.CFrame.LookVector.Y, 0, 1) else 0
+	local shoulderPitch = 112 - 52 * lookDown
+	local elbowPitch = -12 + 18 * lookDown
+	setJointTransform("RightShoulder", CFrame.Angles(math.rad(shoulderPitch), math.rad(-6), math.rad(10)))
+	setJointTransform("RightElbow", CFrame.Angles(math.rad(elbowPitch), 0, math.rad(-3)))
 	setJointTransform("RightWrist", CFrame.Angles(math.rad(-6), 0, 0))
-	setJointTransform("Right Shoulder", CFrame.Angles(math.rad(112), 0, math.rad(10)))
+	setJointTransform("Right Shoulder", CFrame.Angles(math.rad(shoulderPitch), 0, math.rad(10)))
 end
 
 local function clearLanternArmPose()

@@ -22,6 +22,21 @@ vision.TintColor = Color3.fromRGB(165, 185, 195)
 vision.Enabled = false
 vision.Parent = Lighting
 
+-- MapBuilder intentionally disables old post effects. This local bloom is
+-- deterministic and lets the monster's Neon eye cores produce a real soft halo
+-- on every client without changing the server's darkness or exposure.
+local oldEyeBloom = Lighting:FindFirstChild("LocalMonsterEyeBloom")
+if oldEyeBloom then
+	oldEyeBloom:Destroy()
+end
+local eyeBloom = Instance.new("BloomEffect")
+eyeBloom.Name = "LocalMonsterEyeBloom"
+eyeBloom.Intensity = 1.45
+eyeBloom.Size = 18
+eyeBloom.Threshold = 0.82
+eyeBloom.Enabled = true
+eyeBloom.Parent = Lighting
+
 local gui = Instance.new("ScreenGui")
 gui.Name = "BlindOneRoleHud"
 gui.ResetOnSpawn = false
@@ -56,11 +71,92 @@ hint.Parent = gui
 
 local senseLight = Instance.new("PointLight")
 senseLight.Name = "BlindSenseGlow"
-senseLight.Color = Color3.fromRGB(115, 155, 175)
-senseLight.Brightness = 1.45
-senseLight.Range = 28
+senseLight.Color = Color3.fromRGB(105, 130, 138)
+senseLight.Brightness = 3.1
+senseLight.Range = 10
 senseLight.Shadows = false
 senseLight.Enabled = false
+
+-- Direct surface samples make nearby geometry readable even when Lighting's
+-- ambient/fog settings swallow local lights. The fixed pool is local-only and
+-- allocation-free during play, so it cannot create the clone/performance issue.
+local oldGeometrySense = workspace:FindFirstChild("LocalBlindSenseGeometry")
+if oldGeometrySense then
+	oldGeometrySense:Destroy()
+end
+local geometrySense = Instance.new("Folder")
+geometrySense.Name = "LocalBlindSenseGeometry"
+geometrySense.Parent = workspace
+
+local SENSE_COLUMNS = 7
+local SENSE_ROWS = 5
+local SENSE_RANGE = 12
+local senseDots: { Part } = {}
+for index = 1, SENSE_COLUMNS * SENSE_ROWS do
+	local dot = Instance.new("Part")
+	dot.Name = "SurfaceEcho"
+	dot.Shape = Enum.PartType.Ball
+	dot.Size = Vector3.one * 0.2
+	dot.Color = Color3.fromRGB(125, 155, 165)
+	dot.Material = Enum.Material.Neon
+	dot.Anchored = true
+	dot.CanCollide = false
+	dot.CanTouch = false
+	dot.CanQuery = false
+	dot.CastShadow = false
+	dot.Transparency = 1
+	dot.Parent = geometrySense
+	senseDots[index] = dot
+end
+
+local raycastParams = RaycastParams.new()
+raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+raycastParams.IgnoreWater = true
+local nextGeometrySenseAt = 0
+
+local function hideGeometrySense()
+	for _, dot in senseDots do
+		dot.Transparency = 1
+	end
+end
+
+local function updateGeometrySense(camera: Camera, ownCharacter: Model, now: number)
+	if now < nextGeometrySenseAt then
+		return
+	end
+	nextGeometrySenseAt = now + 0.065
+
+	local excluded: { Instance } = { ownCharacter, geometrySense }
+	for _, otherPlayer in Players:GetPlayers() do
+		if otherPlayer.Character and otherPlayer.Character ~= ownCharacter then
+			table.insert(excluded, otherPlayer.Character)
+		end
+	end
+	raycastParams.FilterDescendantsInstances = excluded
+
+	local viewport = camera.ViewportSize
+	local dotIndex = 0
+	for row = 0, SENSE_ROWS - 1 do
+		for column = 0, SENSE_COLUMNS - 1 do
+			dotIndex += 1
+			local screenX = viewport.X * (0.06 + 0.88 * column / (SENSE_COLUMNS - 1))
+			local screenY = viewport.Y * (0.24 + 0.72 * row / (SENSE_ROWS - 1))
+			local ray = camera:ViewportPointToRay(screenX, screenY)
+			local result = workspace:Raycast(ray.Origin, ray.Direction * SENSE_RANGE, raycastParams)
+			local dot = senseDots[dotIndex]
+			if result then
+				local distance = (result.Position - ray.Origin).Magnitude
+				local closeness = 1 - math.clamp(distance / SENSE_RANGE, 0, 1)
+				local size = 0.16 + closeness * 0.2
+				dot.Size = Vector3.one * size
+				dot.CFrame = CFrame.new(result.Position + result.Normal * 0.035)
+				dot.Transparency = 0.24 + (1 - closeness) * 0.54
+			else
+				dot.Transparency = 1
+			end
+		end
+	end
+end
 
 local lastRole = ""
 local roleShownAt = 0
@@ -126,10 +222,17 @@ RunService.RenderStepped:Connect(function()
 			senseLight.Parent = ownRoot
 		end
 		senseLight.Enabled = true
-		senseLight.Brightness = 1.45 + math.sin(now * 2.4) * 0.12
+		-- A bright but tiny local bubble reveals only the floor and walls within a
+		-- few steps. It prevents blind wall-bumping without becoming normal vision.
+		senseLight.Brightness = 3.1 + math.sin(now * 2.4) * 0.16
+		local camera = workspace.CurrentCamera
+		if camera and ownCharacter then
+			updateGeometrySense(camera, ownCharacter, now)
+		end
 	else
 		senseLight.Enabled = false
 		senseLight.Parent = nil
+		hideGeometrySense()
 	end
 
 	for _, target in Players:GetPlayers() do

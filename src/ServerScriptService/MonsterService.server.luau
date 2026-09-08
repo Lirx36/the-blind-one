@@ -10,9 +10,11 @@ local CollectionService = game:GetService("CollectionService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"))
 
 local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 local catchBindable = ServerStorage:WaitForChild("CatchPlayer") :: BindableEvent
+local photoFrozen = false
 
 local function humanBlindOne(): Player?
 	for _, player in Players:GetPlayers() do
@@ -52,30 +54,64 @@ root.Anchored = true -- moved directly by CFrame, no ragdoll physics / replicati
 root.Parent = monster
 monster.PrimaryPart = root
 
-local DARK = Color3.fromRGB(13, 13, 17)
-
-local function limb(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
+local function rigPart(name: string, size: Vector3, position: Vector3): Part
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
-	p.Color = color
-	p.Material = material
+	p.Transparency = 1
 	p.CanCollide = false
-	p.Anchored = true -- whole model is moved rigidly with monster:PivotTo()
-	p.CastShadow = true
+	p.CanTouch = false
+	p.CanQuery = false
+	p.Massless = true
+	p.Anchored = false
+	p.CastShadow = false
 	p.Parent = monster
-	p.CFrame = root.CFrame * offset
+	p.CFrame = root.CFrame * CFrame.new(position)
+	return p
 end
 
--- tall, gaunt, slightly hunched silhouette
-limb("Torso", Vector3.new(1.9, 3.4, 1.0), CFrame.new(0, 0.7, 0) * CFrame.Angles(math.rad(12), 0, 0), DARK, Enum.Material.Slate)
-limb("Head", Vector3.new(1.05, 1.3, 1.05), CFrame.new(0, 2.8, -0.35), DARK, Enum.Material.Slate)
-limb("ArmL", Vector3.new(0.5, 3.7, 0.5), CFrame.new(-1.25, -0.1, 0.1) * CFrame.Angles(math.rad(6), 0, math.rad(6)), DARK, Enum.Material.Slate)
-limb("ArmR", Vector3.new(0.5, 3.7, 0.5), CFrame.new(1.25, -0.1, 0.1) * CFrame.Angles(math.rad(6), 0, math.rad(-6)), DARK, Enum.Material.Slate)
-limb("LegL", Vector3.new(0.6, 3.2, 0.6), CFrame.new(-0.5, -2.9, 0), DARK, Enum.Material.Slate)
-limb("LegR", Vector3.new(0.6, 3.2, 0.6), CFrame.new(0.5, -2.9, 0), DARK, Enum.Material.Slate)
-limb("EyeL", Vector3.new(0.26, 0.14, 0.14), CFrame.new(-0.26, 2.9, -0.9), Color3.fromRGB(225, 240, 255), Enum.Material.Neon)
-limb("EyeR", Vector3.new(0.26, 0.14, 0.14), CFrame.new(0.26, 2.9, -0.9), Color3.fromRGB(225, 240, 255), Enum.Material.Neon)
+local lowerTorso = rigPart("LowerTorso", Vector3.new(1.25, 1, 0.8), Vector3.new(0, -0.05, 0))
+local upperTorso = rigPart("UpperTorso", Vector3.new(2.15, 1.65, 0.9), Vector3.new(0, 1.2, 0))
+local head = rigPart("Head", Vector3.new(1.2, 1.25, 1), Vector3.new(0, 2.75, 0))
+local rightUpperArm = rigPart("RightUpperArm", Vector3.new(0.65, 1.5, 0.65), Vector3.new(1.3, 0.95, 0))
+local rightLowerArm = rigPart("RightLowerArm", Vector3.new(0.6, 1.5, 0.6), Vector3.new(1.46, -0.45, 0))
+local rightHand = rigPart("RightHand", Vector3.new(0.65, 0.75, 0.6), Vector3.new(1.48, -1.65, 0))
+local leftUpperArm = rigPart("LeftUpperArm", Vector3.new(0.65, 1.5, 0.65), Vector3.new(-1.3, 0.95, 0))
+local leftLowerArm = rigPart("LeftLowerArm", Vector3.new(0.6, 1.5, 0.6), Vector3.new(-1.46, -0.45, 0))
+local leftHand = rigPart("LeftHand", Vector3.new(0.65, 0.75, 0.6), Vector3.new(-1.48, -1.65, 0))
+local rightUpperLeg = rigPart("RightUpperLeg", Vector3.new(0.7, 1.65, 0.75), Vector3.new(0.5, -1.05, 0))
+local rightLowerLeg = rigPart("RightLowerLeg", Vector3.new(0.65, 1.55, 0.7), Vector3.new(0.5, -2.55, 0))
+local rightFoot = rigPart("RightFoot", Vector3.new(0.75, 0.45, 1.1), Vector3.new(0.5, -3.48, -0.2))
+local leftUpperLeg = rigPart("LeftUpperLeg", Vector3.new(0.7, 1.65, 0.75), Vector3.new(-0.5, -1.05, 0))
+local leftLowerLeg = rigPart("LeftLowerLeg", Vector3.new(0.65, 1.55, 0.7), Vector3.new(-0.5, -2.55, 0))
+local leftFoot = rigPart("LeftFoot", Vector3.new(0.75, 0.45, 1.1), Vector3.new(-0.5, -3.48, -0.2))
+
+local function rigJoint(name: string, parentPart: BasePart, childPart: BasePart, jointPosition: Vector3)
+	local jointWorld = root.CFrame * CFrame.new(jointPosition)
+	local joint = Instance.new("Motor6D")
+	joint.Name = name
+	joint.Part0 = parentPart
+	joint.Part1 = childPart
+	joint.C0 = parentPart.CFrame:ToObjectSpace(jointWorld)
+	joint.C1 = childPart.CFrame:ToObjectSpace(jointWorld)
+	joint.Parent = childPart
+end
+
+rigJoint("Root", root, lowerTorso, Vector3.new(0, 0.15, 0))
+rigJoint("Waist", lowerTorso, upperTorso, Vector3.new(0, 0.52, 0))
+rigJoint("Neck", upperTorso, head, Vector3.new(0, 2.05, 0))
+rigJoint("RightShoulder", upperTorso, rightUpperArm, Vector3.new(1.06, 1.58, 0))
+rigJoint("RightElbow", rightUpperArm, rightLowerArm, Vector3.new(1.42, 0.22, 0))
+rigJoint("RightWrist", rightLowerArm, rightHand, Vector3.new(1.48, -1.2, 0))
+rigJoint("LeftShoulder", upperTorso, leftUpperArm, Vector3.new(-1.06, 1.58, 0))
+rigJoint("LeftElbow", leftUpperArm, leftLowerArm, Vector3.new(-1.42, 0.22, 0))
+rigJoint("LeftWrist", leftLowerArm, leftHand, Vector3.new(-1.48, -1.2, 0))
+rigJoint("RightHip", lowerTorso, rightUpperLeg, Vector3.new(0.5, -0.45, 0))
+rigJoint("RightKnee", rightUpperLeg, rightLowerLeg, Vector3.new(0.5, -1.82, 0))
+rigJoint("RightAnkle", rightLowerLeg, rightFoot, Vector3.new(0.5, -3.25, 0))
+rigJoint("LeftHip", lowerTorso, leftUpperLeg, Vector3.new(-0.5, -0.45, 0))
+rigJoint("LeftKnee", leftUpperLeg, leftLowerLeg, Vector3.new(-0.5, -1.82, 0))
+rigJoint("LeftAnkle", leftLowerLeg, leftFoot, Vector3.new(-0.5, -3.25, 0))
 
 local humanoid = Instance.new("Humanoid")
 humanoid.Name = "Humanoid"
@@ -88,6 +124,21 @@ humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 humanoid.NameDisplayDistance = 0
 humanoid.HealthDisplayDistance = 0
 humanoid.Parent = monster
+
+-- Solo AI and the player-controlled role share one appearance source. The
+-- hidden target skeleton above gives the imported mesh real joints to follow.
+MonsterAppearance.Apply(monster)
+
+Remotes.PhotoMode.OnServerEvent:Connect(function(player: Player)
+	-- Photo mode is a Studio-only solo-testing aid; it can never freeze a live
+	-- game or a player-controlled Blind One.
+	if not RunService:IsStudio() or humanBlindOne() then
+		return
+	end
+	photoFrozen = not photoFrozen
+	monster:SetAttribute("PhotoFrozen", photoFrozen)
+	Remotes.PhotoMode:FireClient(player, photoFrozen)
+end)
 
 ------------------------------------------------------------------- patrol points
 local function gatherNodes(): { Vector3 }
@@ -297,8 +348,13 @@ RunService.Heartbeat:Connect(function(dt)
 	if not monster.Parent or humanoid.Health <= 0 then
 		return
 	end
+	if photoFrozen then
+		monster:SetAttribute("VisualMoveSpeed", 0)
+		return
+	end
 	local wp = waypoints[wpIndex]
 	if not wp then
+		monster:SetAttribute("VisualMoveSpeed", 0)
 		return
 	end
 
@@ -314,6 +370,7 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 
 	local dir = flat.Unit
+	monster:SetAttribute("VisualMoveSpeed", currentSpeed)
 	local newPos = root.Position + dir * math.min(currentSpeed * dt, flat.Magnitude)
 	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
 	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))
@@ -346,6 +403,12 @@ RunService.Heartbeat:Connect(function()
 	local humanHumanoid = humanCharacter and humanCharacter:FindFirstChildOfClass("Humanoid")
 	if humanMonster then
 		Remotes.Dread:FireClient(humanMonster, 0)
+	end
+	if photoFrozen and not humanMonster then
+		for _, player in Players:GetPlayers() do
+			Remotes.Dread:FireClient(player, 0)
+		end
+		return
 	end
 	if humanMonster and (not humanRoot or not humanHumanoid or humanHumanoid.Health <= 0) then
 		for _, player in Players:GetPlayers() do
