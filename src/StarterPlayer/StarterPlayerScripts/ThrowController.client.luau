@@ -2,11 +2,12 @@
 -- E: pick up a nearby rock.  Left click / R2: throw one where you're looking.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local CollectionService = game:GetService("CollectionService")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
-local Remotes = require(game:GetService("ReplicatedStorage"):WaitForChild("Remotes"))
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 
 local player = Players.LocalPlayer
 local PICKUP_RANGE = 12
@@ -55,26 +56,30 @@ local function root(): BasePart?
 	return char and char:FindFirstChild("HumanoidRootPart") :: BasePart? or nil
 end
 
-local function nearestRock(): BasePart?
+local function lookedAtRock(): BasePart?
 	local hrp = root()
-	if not hrp then
+	local camera = Workspace.CurrentCamera
+	local character = player.Character
+	local held = player:GetAttribute("HeldBalls")
+	if not hrp or not camera or not character or (typeof(held) == "number" and held >= Config.MaxThrowables) then
 		return nil
 	end
-	local best: BasePart? = nil
-	local bestD = PICKUP_RANGE
-	for _, rock in CollectionService:GetTagged("Throwable") do
-		if rock:IsA("BasePart") and rock:IsDescendantOf(Workspace) then
-			local d = (rock.Position - hrp.Position).Magnitude
-			if d < bestD then
-				best, bestD = rock, d
-			end
-		end
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = { character }
+	rayParams.IgnoreWater = true
+	local origin = camera.CFrame.Position
+	local result = Workspace:Raycast(origin, camera.CFrame.LookVector * (PICKUP_RANGE + 4), rayParams)
+	local rock = result and result.Instance
+	if rock and rock:IsA("BasePart") and rock:HasTag("Throwable") and (rock.Position - hrp.Position).Magnitude <= PICKUP_RANGE then
+		return rock
 	end
-	return best
+	return nil
 end
 
 RunService.RenderStepped:Connect(function()
-	local target = if player:GetAttribute("Role") ~= "BlindOne" then nearestRock() else nil
+	local target = if player:GetAttribute("Role") ~= "BlindOne" then lookedAtRock() else nil
 	pickupOutline.Adornee = target
 	pickupOutline.Enabled = target ~= nil
 	pickupBillboard.Adornee = target
@@ -86,9 +91,10 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
-		local rock = nearestRock()
-		if rock then
-			Remotes.Pickup:FireServer(rock)
+		local rock = lookedAtRock()
+		local camera = Workspace.CurrentCamera
+		if rock and camera then
+			Remotes.Pickup:FireServer(rock, camera.CFrame.Position, camera.CFrame.LookVector)
 		end
 	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonR2 then
 		local cam = Workspace.CurrentCamera

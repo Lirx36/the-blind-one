@@ -59,7 +59,7 @@ objective.TextStrokeTransparency = 0.5
 objective.Text = ""
 objective.Parent = gui
 
--- bottom stack: noise meter + stamina + rocks
+-- bottom stack: noise meter + stamina
 local panel = Instance.new("Frame")
 panel.Size = UDim2.fromOffset(300, 52)
 panel.Position = UDim2.new(0.5, -150, 1, -84)
@@ -179,6 +179,75 @@ end
 local noiseFill, noiseText = bar(0, "NOISE")
 local stamFill = bar(26, "STAMINA")
 
+-- A separate hotbar-style rock slot keeps inventory information out of the
+-- noise meter and leaves room for the equipped-rock behavior on key 1.
+local rockSlot = Instance.new("Frame")
+rockSlot.Name = "RockInventorySlot"
+rockSlot.AnchorPoint = Vector2.new(0, 1)
+rockSlot.Position = UDim2.new(0.5, 164, 1, -32)
+rockSlot.Size = UDim2.fromOffset(96, 52)
+rockSlot.BackgroundColor3 = Color3.fromRGB(8, 11, 14)
+rockSlot.BackgroundTransparency = 0.12
+rockSlot.BorderSizePixel = 0
+rockSlot.Parent = gui
+local rockSlotCorner = Instance.new("UICorner")
+rockSlotCorner.CornerRadius = UDim.new(0, 8)
+rockSlotCorner.Parent = rockSlot
+local rockSlotStroke = Instance.new("UIStroke")
+rockSlotStroke.Color = Color3.fromRGB(132, 151, 157)
+rockSlotStroke.Transparency = 0.35
+rockSlotStroke.Thickness = 1
+rockSlotStroke.Parent = rockSlot
+
+local rockKey = Instance.new("TextLabel")
+rockKey.Position = UDim2.fromOffset(6, 6)
+rockKey.Size = UDim2.fromOffset(19, 19)
+rockKey.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
+rockKey.BorderSizePixel = 0
+rockKey.Font = Enum.Font.GothamBold
+rockKey.Text = "1"
+rockKey.TextSize = 11
+rockKey.TextColor3 = Color3.fromRGB(238, 244, 246)
+rockKey.Parent = rockSlot
+local rockKeyCorner = Instance.new("UICorner")
+rockKeyCorner.CornerRadius = UDim.new(0, 4)
+rockKeyCorner.Parent = rockKey
+
+local rockIcon = Instance.new("Frame")
+rockIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+rockIcon.Position = UDim2.fromOffset(49, 27)
+rockIcon.Size = UDim2.fromOffset(25, 25)
+rockIcon.BackgroundColor3 = Color3.fromRGB(76, 72, 63)
+rockIcon.BorderSizePixel = 0
+rockIcon.Rotation = -12
+rockIcon.Parent = rockSlot
+local rockIconCorner = Instance.new("UICorner")
+rockIconCorner.CornerRadius = UDim.new(0.38, 0)
+rockIconCorner.Parent = rockIcon
+local rockIconStroke = Instance.new("UIStroke")
+rockIconStroke.Color = Color3.fromRGB(121, 113, 96)
+rockIconStroke.Transparency = 0.3
+rockIconStroke.Parent = rockIcon
+
+local rockCount = Instance.new("TextLabel")
+rockCount.AnchorPoint = Vector2.new(1, 1)
+rockCount.Position = UDim2.new(1, -7, 1, -5)
+rockCount.Size = UDim2.fromOffset(35, 20)
+rockCount.BackgroundTransparency = 1
+rockCount.Font = Enum.Font.GothamBold
+rockCount.Text = "x0"
+rockCount.TextSize = 14
+rockCount.TextXAlignment = Enum.TextXAlignment.Right
+rockCount.TextColor3 = Color3.fromRGB(237, 241, 239)
+rockCount.Parent = rockSlot
+
+local function setRockCount(value: number)
+	local count = math.max(0, math.floor(value))
+	rockCount.Text = ("x%d"):format(count)
+	rockIcon.BackgroundTransparency = if count > 0 then 0 else 0.65
+	rockCount.TextTransparency = if count > 0 then 0 else 0.5
+end
+
 -- Three compact power indicators make the survivor agenda readable without
 -- turning the horror HUD into a quest log.
 local progressPanel = Instance.new("Frame")
@@ -255,16 +324,17 @@ Remotes.Objective.OnClientEvent:Connect(function(text: string)
 end)
 
 Remotes.HeldCount.OnClientEvent:Connect(function(n: number)
-	noiseText.Text = if n < 0 then "NOISE      balls: ∞" else ("NOISE      balls: %d"):format(n)
+	setRockCount(n)
 end)
 
 RunService.RenderStepped:Connect(function()
 	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
 	panel.Visible = not isBlindOne
 	controlsPanel.Visible = not isBlindOne
+	rockSlot.Visible = not isBlindOne
 	local heldValue = player:GetAttribute("HeldBalls")
 	if typeof(heldValue) == "number" then
-		noiseText.Text = if heldValue < 0 then "NOISE      balls: ∞" else ("NOISE      balls: %d"):format(heldValue)
+		setRockCount(heldValue)
 	end
 	local nr = math.clamp(noise / 100, 0, 1)
 	noiseFill.Size = UDim2.fromScale(nr, 1)
