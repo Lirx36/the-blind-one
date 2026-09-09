@@ -96,15 +96,18 @@ Model-pass goals:
   - Studio-only `J` preview key.
 - Added `assets/jumpscare/blind-one-jumpscare-v1.png`, the final white-eyed
   generated portrait, plus `IMPORT-IN-STUDIO.txt`.
-- Added `Config.JumpscareImage` and `Config.JumpscareSound`. The image field is
-  intentionally empty until the PNG is uploaded through Roblox Asset Manager.
+- Added `Config.JumpscareImage` and `Config.JumpscareSound`. The image uses the
+  experience-local URL `rbxgameasset://Images/blind-one-jumpscare-v1`, so a
+  numeric ID is not required. It preloads safely and falls back to 3D if missing.
 - Catch events now forward the killer position to the client for reliable
   portrait selection.
 - `git diff --check` passed and Rojo 7.7.0 built the project successfully.
 
 ### Immediate next step
 
-Upload `assets/jumpscare/blind-one-jumpscare-v1.png` in Studio, copy its asset
-ID, and set `Config.JumpscareImage` to `rbxassetid://ID`. Then playtest and press
-`J`. Temporarily set `Config.StudioSafeMode = false` only when testing a real AI
-kill, then restore it to `true`.
+Stop the playtest, ensure the place is published/connected to the intended
+experience, then use Studio's `File > Import` on
+`assets/jumpscare/blind-one-jumpscare-v1.png`. The pictured warning rows are
+unrelated Toolbox model inventory entries. Restart the playtest and press `J`.
+Temporarily set `Config.StudioSafeMode = false` only when testing a real AI kill,
+then restore it to `true`.

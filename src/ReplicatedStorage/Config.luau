@@ -37,9 +37,9 @@ return {
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
 	PlayerBlindOneSpeed = 18,
 
-	-- Upload assets/jumpscare/blind-one-jumpscare-v1.png through Asset Manager,
-	-- then paste its Roblox asset id here. Empty values use the live 3D fallback.
-	JumpscareImage = "",
+	-- Import assets/jumpscare/blind-one-jumpscare-v1.png into this experience.
+	-- This name-based URL avoids copying a numeric asset id between computers.
+	JumpscareImage = "rbxgameasset://Images/blind-one-jumpscare-v1",
 	JumpscareSound = "",
 
 	-- ---- round ----

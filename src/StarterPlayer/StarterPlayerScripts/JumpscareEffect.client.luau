@@ -3,6 +3,7 @@
 -- face toward the player. The portrait automatically follows future monster
 -- model upgrades and has an asset-free fallback if no killer can be resolved.
 local Players = game:GetService("Players")
+local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -84,6 +85,16 @@ cyanGhost.ImageTransparency = 0.74
 cyanGhost.ZIndex = 2
 cyanGhost.Parent = gui
 local cyanGhostScale = cyanGhost:FindFirstChildOfClass("UIScale") :: UIScale
+
+local imageReady = false
+if SCARE_IMAGE ~= "" then
+	task.spawn(function()
+		local loaded = pcall(function()
+			ContentProvider:PreloadAsync({ scareImage, redGhost, cyanGhost })
+		end)
+		imageReady = loaded and scareImage.IsLoaded
+	end)
+end
 
 -- Used only if the killer disappears before the event reaches this client,
 -- such as during a Rojo hot-sync restart.
@@ -273,7 +284,9 @@ local function playJumpscare(sourcePosition: Vector3?)
 	local sequence = activeSequence
 	local portraitRoot, portraitModel = preparePortrait(sourcePosition)
 	local hasPortrait = portraitRoot ~= nil and portraitModel ~= nil
-	local hasUploadedImage = SCARE_IMAGE ~= ""
+	-- Moderation and experience permissions can delay an imported image. Never
+	-- trade the working 3D scare for a blank ImageLabel while that happens.
+	local hasUploadedImage = imageReady
 
 	gui.Enabled = true
 	scareImage.Visible = hasUploadedImage
