@@ -37,6 +37,11 @@ return {
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
 	PlayerBlindOneSpeed = 18,
 
+	-- Upload assets/jumpscare/blind-one-jumpscare-v1.png through Asset Manager,
+	-- then paste its Roblox asset id here. Empty values use the live 3D fallback.
+	JumpscareImage = "",
+	JumpscareSound = "",
+
 	-- ---- round ----
 	StudioSafeMode = true, -- in Studio the monster can chase, but cannot kill players
 	RespawnDelay = 3,

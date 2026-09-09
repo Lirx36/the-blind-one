@@ -85,3 +85,26 @@ Model-pass goals:
 - Preserve the user's unrelated local edits if the working tree is dirty.
 - Do not promise exact parity with generated PNG concepts; Roblox lighting and
   material limits still apply.
+
+## PC jumpscare pass (2026-09-09)
+
+- Replaced the red-flash placeholder with a full-screen kill sequence:
+  - generated horror portrait support with zoom, jitter, chromatic split,
+    static, vignette, red impact pulses, and blackout;
+  - live 3D clone of the killer when no uploaded portrait ID is configured;
+  - white-eyed fallback if neither image nor killer model is available;
+  - Studio-only `J` preview key.
+- Added `assets/jumpscare/blind-one-jumpscare-v1.png`, the final white-eyed
+  generated portrait, plus `IMPORT-IN-STUDIO.txt`.
+- Added `Config.JumpscareImage` and `Config.JumpscareSound`. The image field is
+  intentionally empty until the PNG is uploaded through Roblox Asset Manager.
+- Catch events now forward the killer position to the client for reliable
+  portrait selection.
+- `git diff --check` passed and Rojo 7.7.0 built the project successfully.
+
+### Immediate next step
+
+Upload `assets/jumpscare/blind-one-jumpscare-v1.png` in Studio, copy its asset
+ID, and set `Config.JumpscareImage` to `rbxassetid://ID`. Then playtest and press
+`J`. Temporarily set `Config.StudioSafeMode = false` only when testing a real AI
+kill, then restore it to `true`.
