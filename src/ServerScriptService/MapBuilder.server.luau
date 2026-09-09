@@ -5,7 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local MAP_VERSION = "TheHollow_1"
+local MAP_VERSION = "TheHollow_2"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
 if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then
 	return
@@ -92,15 +92,15 @@ pcall(function()
 	(Lighting :: any).Technology = Enum.Technology.Future
 end)
 Lighting.ClockTime = 1.35
-Lighting.Brightness = 0.62
-Lighting.Ambient = Color3.fromRGB(10, 12, 14)
-Lighting.OutdoorAmbient = Color3.fromRGB(4, 6, 7)
-Lighting.EnvironmentDiffuseScale = 0.08
+Lighting.Brightness = 0.9
+Lighting.Ambient = Color3.fromRGB(20, 23, 24)
+Lighting.OutdoorAmbient = Color3.fromRGB(12, 15, 16)
+Lighting.EnvironmentDiffuseScale = 0.14
 Lighting.EnvironmentSpecularScale = 0.05
 Lighting.GlobalShadows = true
-Lighting.FogColor = Color3.fromRGB(5, 8, 9)
-Lighting.FogStart = 24
-Lighting.FogEnd = 155
+Lighting.FogColor = Color3.fromRGB(10, 14, 15)
+Lighting.FogStart = 34
+Lighting.FogEnd = 180
 
 for _, effect in Lighting:GetChildren() do
 	if effect.Name == "TheHollowGrade" or effect.Name == "TheHollowAtmosphere" then
@@ -114,9 +114,9 @@ end
 
 local grade = Instance.new("ColorCorrectionEffect")
 grade.Name = "TheHollowGrade"
-grade.Brightness = -0.045
-grade.Contrast = 0.18
-grade.Saturation = -0.28
+grade.Brightness = 0.015
+grade.Contrast = 0.10
+grade.Saturation = -0.20
 grade.TintColor = Color3.fromRGB(194, 211, 207)
 grade.Parent = Lighting
 
@@ -124,8 +124,8 @@ local atmosphere = Instance.new("Atmosphere")
 atmosphere.Name = "TheHollowAtmosphere"
 atmosphere.Color = Color3.fromRGB(55, 68, 65)
 atmosphere.Decay = Color3.fromRGB(12, 17, 18)
-atmosphere.Density = 0.22
-atmosphere.Haze = 1.15
+atmosphere.Density = 0.12
+atmosphere.Haze = 0.5
 atmosphere.Glare = 0
 atmosphere.Offset = -0.15
 atmosphere.Parent = Lighting
@@ -439,7 +439,8 @@ end
 
 for index = 1, 11 do
 	local anchor = patrolPositions[((index - 1) % #patrolPositions) + 1]
-	local rock = part({ Name = "Rock", Shape = Enum.PartType.Ball, Size = Vector3.new(1, 1, 1), Position = anchor + Vector3.new(rng:NextNumber(-5, 5), 1, rng:NextNumber(-5, 5)), Color = Color3.fromRGB(65, 68, 65), Material = Enum.Material.Slate, Anchored = false })
+	local size = rng:NextNumber(0.82, 1.08)
+	local rock = part({ Name = "Rock", Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), Position = anchor + Vector3.new(rng:NextNumber(-5, 5), 1, rng:NextNumber(-5, 5)), Color = Color3.fromRGB(rng:NextInteger(50, 63), rng:NextInteger(48, 58), rng:NextInteger(43, 52)), Material = Enum.Material.Rock, Anchored = false })
 	CollectionService:AddTag(rock, "Throwable")
 end
 

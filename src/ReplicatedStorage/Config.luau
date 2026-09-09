@@ -42,4 +42,5 @@ return {
 	RespawnDelay = 3,
 	SpawnGrace = 3, -- seconds of immunity right after (re)spawning
 	StartThrowables = 3,
+	MaxThrowables = 4,
 }

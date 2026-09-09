@@ -5,7 +5,6 @@ local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
-local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
@@ -15,20 +14,10 @@ local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 
 local held: { [Player]: number } = {}
 
-local function isInfiniteBallTester(player: Player): boolean
-	-- Lirx is the project owner/tester. Studio's first simulated client stands in
-	-- for that account during Server + Players tests.
-	return player.Name == "Lirx"
-		or player.Name == "Lirx36"
-		or (game.CreatorId > 0 and player.UserId == game.CreatorId)
-		or (RunService:IsStudio() and player.Name == "Player1")
-end
-
 local function setHeld(player: Player, n: number)
-	held[player] = math.max(0, n)
-	local shownCount = if isInfiniteBallTester(player) then -1 else held[player]
-	player:SetAttribute("HeldBalls", shownCount)
-	Remotes.HeldCount:FireClient(player, shownCount)
+	held[player] = math.clamp(n, 0, Config.MaxThrowables)
+	player:SetAttribute("HeldBalls", held[player])
+	Remotes.HeldCount:FireClient(player, held[player])
 end
 
 local function setupPlayer(player: Player)
@@ -53,9 +42,9 @@ local function makeRock(pos: Vector3): BasePart
 	local rock = Instance.new("Part")
 	rock.Name = "Rock"
 	rock.Shape = Enum.PartType.Ball
-	rock.Size = Vector3.new(1, 1, 1)
-	rock.Color = Color3.fromRGB(70, 70, 78)
-	rock.Material = Enum.Material.Slate
+	rock.Size = Vector3.new(0.92, 0.92, 0.92)
+	rock.Color = Color3.fromRGB(58, 55, 49)
+	rock.Material = Enum.Material.Rock
 	rock.Position = pos
 	rock:SetAttribute("SessionThrownBall", true)
 	rock.Parent = workspace
@@ -72,32 +61,46 @@ for _, oldRock in CollectionService:GetTagged("Throwable") do
 	end
 end
 
-Remotes.Pickup.OnServerEvent:Connect(function(player, rock)
+Remotes.Pickup.OnServerEvent:Connect(function(player, rock, cameraOrigin, cameraLook)
 	if player:GetAttribute("Role") == "BlindOne" then
 		return
 	end
 	if typeof(rock) ~= "Instance" or not rock:IsA("BasePart") or not rock:HasTag("Throwable") then
 		return
 	end
+	if (held[player] or 0) >= Config.MaxThrowables then
+		return
+	end
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hrp or (hrp.Position - rock.Position).Magnitude > 12 then
+	local head = char and char:FindFirstChild("Head") :: BasePart?
+	if not hrp or not head or typeof(cameraOrigin) ~= "Vector3" or typeof(cameraLook) ~= "Vector3" then
+		return
+	end
+	local toRock = rock.Position - cameraOrigin
+	if (hrp.Position - rock.Position).Magnitude > 12 or (cameraOrigin - head.Position).Magnitude > 6 or toRock.Magnitude < 0.1 then
+		return
+	end
+	if cameraLook.Magnitude < 0.9 or cameraLook.Unit:Dot(toRock.Unit) < 0.975 then
+		return
+	end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = { char }
+	rayParams.IgnoreWater = true
+	local hit = workspace:Raycast(cameraOrigin, toRock, rayParams)
+	if not hit or hit.Instance ~= rock then
 		return
 	end
 	rock:Destroy()
-	if isInfiniteBallTester(player) then
-		setHeld(player, held[player] or Config.StartThrowables)
-	else
-		setHeld(player, (held[player] or 0) + 1)
-	end
+	setHeld(player, (held[player] or 0) + 1)
 end)
 
 Remotes.Throw.OnServerEvent:Connect(function(player, direction)
 	if player:GetAttribute("Role") == "BlindOne" then
 		return
 	end
-	local infinite = isInfiniteBallTester(player)
-	if typeof(direction) ~= "Vector3" or (not infinite and (held[player] or 0) <= 0) then
+	if typeof(direction) ~= "Vector3" or (held[player] or 0) <= 0 then
 		return
 	end
 	local char = player.Character
@@ -106,11 +109,7 @@ Remotes.Throw.OnServerEvent:Connect(function(player, direction)
 	if not hrp or not hum or hum.Health <= 0 then
 		return
 	end
-	if infinite then
-		setHeld(player, held[player] or Config.StartThrowables)
-	else
-		setHeld(player, (held[player] or 0) - 1)
-	end
+	setHeld(player, (held[player] or 0) - 1)
 
 	local dir = direction.Unit
 	local rock = makeRock(hrp.Position + dir * 3 + Vector3.new(0, 2, 0))
