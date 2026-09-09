@@ -103,7 +103,13 @@ local function setRole(player: Player, role: string)
 		if role == "BlindOne" then
 			Remotes.Objective:FireClient(player, "YOU ARE THE BLIND ONE — follow sound and catch every survivor.")
 		else
-			Remotes.Objective:FireClient(player, "Find the key. Don't let it hear you.")
+			local map = workspace:FindFirstChild("GeneratedMap")
+			local active = if map then map:GetAttribute("MechanismsActive") else 0
+			local total = if map then map:GetAttribute("MechanismsTotal") else 3
+			Remotes.Objective:FireClient(player, ("Restore the gate mechanisms (%d/%d). Stay quiet."):format(
+				if typeof(active) == "number" then active else 0,
+				if typeof(total) == "number" then total else 3
+			))
 		end
 	end
 end

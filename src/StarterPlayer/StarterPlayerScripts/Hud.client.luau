@@ -109,7 +109,7 @@ local controls = {
 	{ "SHIFT", "SPRINT" },
 	{ "CTRL", "CROUCH" },
 	{ "F", "LANTERN" },
-	{ "E", "PICK UP BALL" },
+	{ "E", "INTERACT / PICK UP" },
 	{ "LMB", "THROW BALL" },
 }
 for index, control in controls do
@@ -178,6 +178,66 @@ end
 
 local noiseFill, noiseText = bar(0, "NOISE")
 local stamFill = bar(26, "STAMINA")
+
+-- Three compact power indicators make the survivor agenda readable without
+-- turning the horror HUD into a quest log.
+local progressPanel = Instance.new("Frame")
+progressPanel.Name = "GateProgress"
+progressPanel.AnchorPoint = Vector2.new(0.5, 0)
+progressPanel.Position = UDim2.new(0.5, 0, 0, 58)
+progressPanel.Size = UDim2.fromOffset(196, 30)
+progressPanel.BackgroundColor3 = Color3.fromRGB(7, 10, 10)
+progressPanel.BackgroundTransparency = 0.30
+progressPanel.BorderSizePixel = 0
+progressPanel.Parent = gui
+local progressCorner = Instance.new("UICorner")
+progressCorner.CornerRadius = UDim.new(0, 8)
+progressCorner.Parent = progressPanel
+local progressLabel = Instance.new("TextLabel")
+progressLabel.Position = UDim2.fromOffset(10, 0)
+progressLabel.Size = UDim2.fromOffset(86, 30)
+progressLabel.BackgroundTransparency = 1
+progressLabel.Font = Enum.Font.GothamBold
+progressLabel.Text = "GATE POWER"
+progressLabel.TextSize = 10
+progressLabel.TextXAlignment = Enum.TextXAlignment.Left
+progressLabel.TextColor3 = Color3.fromRGB(161, 176, 171)
+progressLabel.Parent = progressPanel
+local progressPips: { Frame } = {}
+for index = 1, 3 do
+	local pip = Instance.new("Frame")
+	pip.Name = "Mechanism" .. index
+	pip.Position = UDim2.fromOffset(98 + (index - 1) * 29, 8)
+	pip.Size = UDim2.fromOffset(20, 14)
+	pip.BackgroundColor3 = Color3.fromRGB(105, 35, 27)
+	pip.BorderSizePixel = 0
+	pip.Parent = progressPanel
+	local pipCorner = Instance.new("UICorner")
+	pipCorner.CornerRadius = UDim.new(0, 4)
+	pipCorner.Parent = pip
+	table.insert(progressPips, pip)
+end
+
+local generatedMap = workspace:WaitForChild("GeneratedMap")
+local function refreshGateProgress()
+	local activeValue = generatedMap:GetAttribute("MechanismsActive")
+	local active = if typeof(activeValue) == "number" then activeValue else 0
+	progressPanel.Visible = player:GetAttribute("Role") ~= "BlindOne"
+	for index, pip in progressPips do
+		pip.BackgroundColor3 = if index <= active then Color3.fromRGB(80, 188, 123) else Color3.fromRGB(105, 35, 27)
+	end
+	if generatedMap:GetAttribute("GateOpen") == true then
+		progressLabel.Text = "GATE OPEN"
+		progressLabel.TextColor3 = Color3.fromRGB(117, 220, 155)
+	else
+		progressLabel.Text = "GATE POWER"
+		progressLabel.TextColor3 = Color3.fromRGB(161, 176, 171)
+	end
+end
+generatedMap:GetAttributeChangedSignal("MechanismsActive"):Connect(refreshGateProgress)
+generatedMap:GetAttributeChangedSignal("GateOpen"):Connect(refreshGateProgress)
+player:GetAttributeChangedSignal("Role"):Connect(refreshGateProgress)
+refreshGateProgress()
 
 -- remote wiring
 local noise = 0
