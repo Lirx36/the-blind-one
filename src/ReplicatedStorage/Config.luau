@@ -37,9 +37,6 @@ return {
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
 	PlayerBlindOneSpeed = 18,
 
-	-- The portrait is embedded in code, so it requires no cloud image asset.
-	JumpscareSound = "",
-
 	-- ---- round ----
 	StudioSafeMode = true, -- in Studio the monster can chase, but cannot kill players
 	RespawnDelay = 3,

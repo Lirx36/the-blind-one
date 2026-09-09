@@ -86,7 +86,7 @@ Model-pass goals:
 - Do not promise exact parity with generated PNG concepts; Roblox lighting and
   material limits still apply.
 
-## PC jumpscare pass (2026-09-09)
+## Removed jumpscare experiment (2026-09-09)
 
 - Replaced the red-flash placeholder with a full-screen kill sequence:
   - generated horror portrait support with zoom, jitter, chromatic split,
@@ -107,8 +107,9 @@ Model-pass goals:
   portrait selection.
 - `git diff --check` passed and Rojo 7.7.0 built the project successfully.
 
-### Immediate next step
+### Final decision
 
-No image import is required. Build/open the latest project, restart the playtest,
-and press `J`. Temporarily set `Config.StudioSafeMode = false` only when testing
-a real AI kill, then restore it to `true`.
+The user rejected this experiment and requested complete removal. The client
+overlay, `J` preview, image data, source art/generator, remote event, sound config,
+and server trigger were removed. Monster catches now go directly to normal Roblox
+death and respawn with no custom death screen or jumpscare.

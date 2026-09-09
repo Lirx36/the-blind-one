@@ -462,7 +462,7 @@ RunService.Heartbeat:Connect(function()
 			local d = (hrp.Position - sourcePosition).Magnitude
 			local graced = os.clock() - (spawnedAt[player] or 0) < Config.SpawnGrace
 			if d < Config.MonsterCatchDistance and not graced then
-				catchBindable:Fire(player, humanMonster ~= nil, sourcePosition)
+				catchBindable:Fire(player, humanMonster ~= nil)
 			end
 			Remotes.Dread:FireClient(player, math.clamp(1 - d / 45, 0, 1))
 		end

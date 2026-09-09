@@ -124,7 +124,7 @@ Players.PlayerRemoving:Connect(function(player)
 	crankHolds[player] = nil
 end)
 
-catchEvent.Event:Connect(function(player: Player, caughtByHuman: boolean?, sourcePosition: Vector3?)
+catchEvent.Event:Connect(function(player: Player, caughtByHuman: boolean?)
 	if caughtDebounce[player] or player:GetAttribute("Escaped") == true or player:GetAttribute("Role") == "BlindOne" then return end
 	if Config.StudioSafeMode and RunService:IsStudio() and not caughtByHuman then
 		caughtDebounce[player] = true
@@ -135,8 +135,6 @@ catchEvent.Event:Connect(function(player: Player, caughtByHuman: boolean?, sourc
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return end
 	caughtDebounce[player] = true
-	Remotes.Jumpscare:FireClient(player, sourcePosition)
-	task.wait(0.15)
 	humanoid.Health = 0
 end)
 
