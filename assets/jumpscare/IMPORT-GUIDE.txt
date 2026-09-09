@@ -11,12 +11,12 @@ Import the jumpscare through the current experience instead:
    Asset Manager cannot manage experience assets from an unpublished local file.
 3. In Studio choose File > Import.
 4. Select this file:
-      assets/jumpscare/blind-one-jumpscare-v1.png
+      assets/jumpscare/blind-one-jumpscare-safe-v2.png
 5. Finish the import/upload and wait for moderation.
 6. Restart the playtest and press J.
 
 No numeric asset ID is required. The game refers to it by name as:
-  rbxgameasset://Images/blind-one-jumpscare-v1
+  rbxgameasset://Images/blind-one-jumpscare-safe-v2
 
 If Roblox has not approved or loaded it yet, the effect safely uses the live 3D
 monster portrait instead of displaying a blank image.

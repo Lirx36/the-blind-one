@@ -94,10 +94,11 @@ Model-pass goals:
   - live 3D clone of the killer when no uploaded portrait ID is configured;
   - white-eyed fallback if neither image nor killer model is available;
   - Studio-only `J` preview key.
-- Added `assets/jumpscare/blind-one-jumpscare-v1.png`, the final white-eyed
-  generated portrait, plus `IMPORT-IN-STUDIO.txt`.
+- The original v1 portrait was rejected by Roblox for violent content/gore and
+  was removed. Replaced it with the non-graphic, white-eyed, sealed-mask image
+  `assets/jumpscare/blind-one-jumpscare-safe-v2.png`.
 - Added `Config.JumpscareImage` and `Config.JumpscareSound`. The image uses the
-  experience-local URL `rbxgameasset://Images/blind-one-jumpscare-v1`, so a
+  experience-local URL `rbxgameasset://Images/blind-one-jumpscare-safe-v2`, so a
   numeric ID is not required. It preloads safely and falls back to 3D if missing.
 - Catch events now forward the killer position to the client for reliable
   portrait selection.
@@ -107,7 +108,7 @@ Model-pass goals:
 
 Stop the playtest, ensure the place is published/connected to the intended
 experience, then use Studio's `File > Import` on
-`assets/jumpscare/blind-one-jumpscare-v1.png`. The pictured warning rows are
+`assets/jumpscare/blind-one-jumpscare-safe-v2.png`. The pictured warning rows are
 unrelated Toolbox model inventory entries. Restart the playtest and press `J`.
 Temporarily set `Config.StudioSafeMode = false` only when testing a real AI kill,
 then restore it to `true`.
