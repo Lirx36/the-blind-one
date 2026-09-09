@@ -5,6 +5,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local player = Players.LocalPlayer
@@ -88,6 +90,14 @@ local geometrySense = Instance.new("Folder")
 geometrySense.Name = "LocalBlindSenseGeometry"
 geometrySense.Parent = workspace
 
+local oldSoundFigures = workspace:FindFirstChild("LocalBlindSoundFigures")
+if oldSoundFigures then
+	oldSoundFigures:Destroy()
+end
+local soundFigures = Instance.new("Folder")
+soundFigures.Name = "LocalBlindSoundFigures"
+soundFigures.Parent = workspace
+
 local SENSE_COLUMNS = 7
 local SENSE_ROWS = 5
 local SENSE_RANGE = 12
@@ -126,7 +136,7 @@ local function updateGeometrySense(camera: Camera, ownCharacter: Model, now: num
 	end
 	nextGeometrySenseAt = now + 0.065
 
-	local excluded: { Instance } = { ownCharacter, geometrySense }
+	local excluded: { Instance } = { ownCharacter, geometrySense, soundFigures }
 	for _, otherPlayer in Players:GetPlayers() do
 		if otherPlayer.Character and otherPlayer.Character ~= ownCharacter then
 			table.insert(excluded, otherPlayer.Character)
@@ -161,39 +171,280 @@ end
 local lastRole = ""
 local roleShownAt = 0
 
-local highlights: { [Player]: Highlight } = {}
-local lastHeard: { [Player]: number } = {}
-local lastStrength: { [Player]: number } = {}
+type EchoFigure = {
+	model: Model,
+	highlight: Highlight,
+	billboard: BillboardGui,
+	strokes: { UIStroke },
+	parts: { [string]: Part },
+	phase: number,
+	position: Vector3?,
+	direction: Vector3?,
+}
 
-local function highlightFor(target: Player): Highlight
-	local existing = highlights[target]
-	if existing then
-		return existing
-	end
+local survivorFigures: { [Player]: EchoFigure } = {}
+local rockFigures: { [BasePart]: EchoFigure } = {}
+local hiddenParts: { [BasePart]: number } = {}
+local hiddenNameplates: { [Humanoid]: Enum.HumanoidDisplayDistanceType } = {}
+local hiddenDecoyBalls: { [BasePart]: number } = {}
+local ownVisualParts: { [BasePart]: number } = {}
+local ownVisualLights: { [Light]: boolean } = {}
+local ownVisualHighlights: { [Highlight]: boolean } = {}
+
+local function echoPart(model: Model, name: string, size: Vector3, shape: Enum.PartType?): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Shape = shape or Enum.PartType.Block
+	part.Color = Color3.fromRGB(185, 210, 220)
+	part.Material = Enum.Material.Neon
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.CastShadow = false
+	part.Parent = model
+	return part
+end
+
+local function newEchoFigure(name: string): EchoFigure
+	local model = Instance.new("Model")
+	model.Name = name
+	model.Parent = soundFigures
+	local parts = {
+		Torso = echoPart(model, "Torso", Vector3.new(1.3, 1.65, 0.62)),
+		Head = echoPart(model, "Head", Vector3.new(0.82, 0.82, 0.82), Enum.PartType.Ball),
+		LeftArm = echoPart(model, "LeftArm", Vector3.new(0.42, 1.62, 0.48)),
+		RightArm = echoPart(model, "RightArm", Vector3.new(0.42, 1.62, 0.48)),
+		LeftLeg = echoPart(model, "LeftLeg", Vector3.new(0.5, 1.72, 0.55)),
+		RightLeg = echoPart(model, "RightLeg", Vector3.new(0.5, 1.72, 0.55)),
+	}
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "LocalSoundSilhouette"
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillColor = Color3.fromRGB(205, 225, 235)
 	highlight.OutlineColor = Color3.fromRGB(240, 250, 255)
-	highlight.FillTransparency = 0.82
-	highlight.OutlineTransparency = 0.08
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 1
 	highlight.Enabled = false
-	highlight.Parent = workspace
-	highlights[target] = highlight
-	return highlight
+	highlight.Adornee = model
+	highlight.Parent = model
+
+	-- Highlights are not dependable through every opaque Roblox material. This
+	-- anonymous outline is drawn in screen space over the echo's torso, so sound
+	-- is readable through walls without revealing the survivor's real avatar.
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ThroughWallSoundOutline"
+	billboard.Adornee = parts.Torso
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 500
+	billboard.Size = UDim2.fromOffset(68, 108)
+	billboard.Enabled = false
+	billboard.Parent = parts.Torso
+
+	local strokes: { UIStroke } = {}
+	local function outlinePiece(
+		pieceName: string,
+		position: UDim2,
+		size: UDim2,
+		rotation: number,
+		round: boolean
+	)
+		local piece = Instance.new("Frame")
+		piece.Name = pieceName
+		piece.AnchorPoint = Vector2.new(0.5, 0.5)
+		piece.Position = position
+		piece.Size = size
+		piece.Rotation = rotation
+		piece.BackgroundTransparency = 1
+		piece.Parent = billboard
+		if round then
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(1, 0)
+			corner.Parent = piece
+		end
+		local stroke = Instance.new("UIStroke")
+		stroke.Name = "SoundStroke"
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Color = Color3.fromRGB(225, 244, 255)
+		stroke.Thickness = 2.2
+		stroke.Transparency = 1
+		stroke.Parent = piece
+		table.insert(strokes, stroke)
+	end
+
+	outlinePiece("Head", UDim2.fromScale(0.5, 0.12), UDim2.fromScale(0.31, 0.2), 0, true)
+	outlinePiece("Torso", UDim2.fromScale(0.5, 0.42), UDim2.fromScale(0.45, 0.36), 0, false)
+	outlinePiece("LeftArm", UDim2.fromScale(0.25, 0.45), UDim2.fromScale(0.15, 0.44), 8, true)
+	outlinePiece("RightArm", UDim2.fromScale(0.75, 0.45), UDim2.fromScale(0.15, 0.44), -8, true)
+	outlinePiece("LeftLeg", UDim2.fromScale(0.39, 0.78), UDim2.fromScale(0.17, 0.42), 3, true)
+	outlinePiece("RightLeg", UDim2.fromScale(0.61, 0.78), UDim2.fromScale(0.17, 0.42), -3, true)
+
+	return {
+		model = model,
+		highlight = highlight,
+		billboard = billboard,
+		strokes = strokes,
+		parts = parts,
+		phase = 0,
+	}
+end
+
+local function survivorFigure(target: Player): EchoFigure
+	local existing = survivorFigures[target]
+	if existing then
+		return existing
+	end
+	local figure = newEchoFigure("AnonymousSurvivorEcho")
+	survivorFigures[target] = figure
+	return figure
+end
+
+local function rockFigure(rock: BasePart): EchoFigure
+	local existing = rockFigures[rock]
+	if existing then
+		return existing
+	end
+	local figure = newEchoFigure("AnonymousDecoyEcho")
+	rockFigures[rock] = figure
+	return figure
+end
+
+
+local function poseEcho(
+	figure: EchoFigure,
+	center: Vector3,
+	direction: Vector3,
+	speed: number,
+	strength: number,
+	dt: number,
+	forceMotion: boolean
+)
+	for _, part in figure.parts do
+		-- Highlight stops rendering reliably on almost-fully-transparent parts.
+		-- A dim Neon body guarantees a readable anonymous echo in the darkness;
+		-- the real survivor avatar remains locally hidden.
+		part.Transparency = 0.82
+	end
+	local flatDirection = Vector3.new(direction.X, 0, direction.Z)
+	if flatDirection.Magnitude < 0.01 then
+		flatDirection = Vector3.new(0, 0, -1)
+	else
+		flatDirection = flatDirection.Unit
+	end
+	local base = CFrame.lookAt(center, center + flatDirection)
+	local motionWeight = if forceMotion then 0.9 else math.clamp(speed / 8, 0, 1)
+	if motionWeight > 0.02 then
+		figure.phase += dt * (3.8 + math.min(speed, 20) * 0.22)
+	end
+	local swing = math.sin(figure.phase) * math.rad(24) * motionWeight
+	local bob = math.abs(math.sin(figure.phase)) * 0.08 * motionWeight
+	figure.parts.Torso.CFrame = base * CFrame.new(0, bob, 0)
+	figure.parts.Head.CFrame = base * CFrame.new(0, 1.36 + bob, 0)
+	figure.parts.LeftArm.CFrame = base * CFrame.new(-0.91, 0.02 + bob, 0) * CFrame.Angles(swing, 0, 0)
+	figure.parts.RightArm.CFrame = base * CFrame.new(0.91, 0.02 + bob, 0) * CFrame.Angles(-swing, 0, 0)
+	figure.parts.LeftLeg.CFrame = base * CFrame.new(-0.37, -1.67 + bob, 0) * CFrame.Angles(-swing, 0, 0)
+	figure.parts.RightLeg.CFrame = base * CFrame.new(0.37, -1.67 + bob, 0) * CFrame.Angles(swing, 0, 0)
+	figure.highlight.Enabled = strength > 0.02
+	figure.highlight.FillTransparency = 0.93 - strength * 0.2
+	figure.highlight.OutlineTransparency = 0.62 - strength * 0.58
+	figure.billboard.Enabled = strength > 0.02
+	local strokeTransparency = math.clamp(0.76 - strength * 0.72, 0.04, 0.72)
+	for _, stroke in figure.strokes do
+		stroke.Transparency = strokeTransparency
+	end
+end
+
+local function hideEcho(figure: EchoFigure)
+	figure.highlight.Enabled = false
+	figure.billboard.Enabled = false
+	for _, part in figure.parts do
+		part.Transparency = 1
+	end
+end
+
+local function hideOwnBlindOneVisual(character: Model?, hidden: boolean)
+	local visual = character and character:FindFirstChild("BlindOneVisual")
+	if hidden and visual then
+		for _, descendant in visual:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				if ownVisualParts[descendant] == nil then
+					ownVisualParts[descendant] = descendant.LocalTransparencyModifier
+				end
+				descendant.LocalTransparencyModifier = 1
+			elseif descendant:IsA("Light") then
+				if ownVisualLights[descendant] == nil then
+					ownVisualLights[descendant] = descendant.Enabled
+				end
+				descendant.Enabled = false
+			elseif descendant:IsA("Highlight") then
+				if ownVisualHighlights[descendant] == nil then
+					ownVisualHighlights[descendant] = descendant.Enabled
+				end
+				descendant.Enabled = false
+			end
+		end
+		return
+	end
+	for part, original in ownVisualParts do
+		if part.Parent then
+			part.LocalTransparencyModifier = original
+		end
+		ownVisualParts[part] = nil
+	end
+	for light, original in ownVisualLights do
+		if light.Parent then
+			light.Enabled = original
+		end
+		ownVisualLights[light] = nil
+	end
+	for highlight, original in ownVisualHighlights do
+		if highlight.Parent then
+			highlight.Enabled = original
+		end
+		ownVisualHighlights[highlight] = nil
+	end
+end
+
+local function hideActualCharacter(character: Model, hidden: boolean)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		if hidden then
+			if hiddenNameplates[humanoid] == nil then
+				hiddenNameplates[humanoid] = humanoid.DisplayDistanceType
+			end
+			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		elseif hiddenNameplates[humanoid] ~= nil then
+			humanoid.DisplayDistanceType = hiddenNameplates[humanoid]
+			hiddenNameplates[humanoid] = nil
+		end
+	end
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			if hidden then
+				if hiddenParts[descendant] == nil then
+					hiddenParts[descendant] = descendant.LocalTransparencyModifier
+				end
+				descendant.LocalTransparencyModifier = 1
+			elseif hiddenParts[descendant] ~= nil then
+				descendant.LocalTransparencyModifier = hiddenParts[descendant]
+				hiddenParts[descendant] = nil
+			end
+		end
+	end
 end
 
 Players.PlayerRemoving:Connect(function(target)
-	local highlight = highlights[target]
-	if highlight then
-		highlight:Destroy()
+	local figure = survivorFigures[target]
+	if figure then
+		figure.model:Destroy()
 	end
-	highlights[target] = nil
-	lastHeard[target] = nil
-	lastStrength[target] = nil
+	survivorFigures[target] = nil
 end)
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 	local roleValue = player:GetAttribute("Role")
 	local role = if typeof(roleValue) == "string" then roleValue else ""
 	local isBlindOne = role == "BlindOne"
@@ -217,6 +468,9 @@ RunService.RenderStepped:Connect(function()
 	gui.Enabled = role ~= "" and now - roleShownAt < 8
 	local ownCharacter = player.Character
 	local ownRoot = ownCharacter and ownCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
+	-- The monster skin is deliberately huge and textured, but those same meshes
+	-- must not sit inside the local first-person camera. This is client-only.
+	hideOwnBlindOneVisual(ownCharacter, isBlindOne)
 	if isBlindOne and ownRoot then
 		if senseLight.Parent ~= ownRoot then
 			senseLight.Parent = ownRoot
@@ -239,8 +493,11 @@ RunService.RenderStepped:Connect(function()
 		if target == player then
 			continue
 		end
-		local highlight = highlightFor(target)
+		local figure = survivorFigure(target)
 		local character = target.Character
+		if character then
+			hideActualCharacter(character, isBlindOne)
+		end
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local noiseValue = target:GetAttribute("Noise")
@@ -258,16 +515,128 @@ RunService.RenderStepped:Connect(function()
 			local loudness = math.clamp(noise / Config.NoiseWalk, 0.45, 1)
 			strength = math.clamp((0.35 + proximity * 0.65) * loudness, 0, 1)
 		end
-		if audible then
-			lastHeard[target] = now
-			lastStrength[target] = strength
+		-- No after-image: once the survivor's noise falls below the hearing floor,
+		-- the outline vanishes with the meter instead of leaking their position.
+		local shownStrength = if audible then strength else 0
+		if isBlindOne and root and shownStrength > 0.02 then
+			local velocity = root.AssemblyLinearVelocity
+			local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+			poseEcho(figure, root.Position, root.CFrame.LookVector, speed, shownStrength, dt, false)
+		else
+			hideEcho(figure)
 		end
-		local age = now - (lastHeard[target] or -100)
-		local afterglow = math.clamp(1 - age / 2.5, 0, 1)
-		local shownStrength = math.max(strength, (lastStrength[target] or 0) * afterglow)
-		highlight.Adornee = character
-		highlight.Enabled = isBlindOne and character ~= nil and shownStrength > 0.02
-		highlight.FillTransparency = 0.94 - shownStrength * 0.3
-		highlight.OutlineTransparency = 0.8 - shownStrength * 0.72
+	end
+
+	-- A thrown rock is deliberately indistinguishable from a survivor echo. The
+	-- projectile may travel at 90 studs/sec, but its fake person is capped at a
+	-- believable running speed and projected onto the floor.
+	local seenRocks: { [BasePart]: boolean } = {}
+	local serverNow = Workspace:GetServerTimeNow()
+	local rockGroundParams = RaycastParams.new()
+	rockGroundParams.FilterType = Enum.RaycastFilterType.Exclude
+	rockGroundParams.IgnoreWater = true
+	for _, tagged in CollectionService:GetTagged("Throwable") do
+		if not tagged:IsA("BasePart") or tagged:GetAttribute("BlindOneDecoy") ~= true then
+			continue
+		end
+		local untilValue = tagged:GetAttribute("BlindOneDecoyUntil")
+		if typeof(untilValue) ~= "number" or untilValue <= serverNow then
+			continue
+		end
+		seenRocks[tagged] = true
+		local figure = rockFigure(tagged)
+		if isBlindOne then
+			if hiddenDecoyBalls[tagged] == nil then
+				hiddenDecoyBalls[tagged] = tagged.LocalTransparencyModifier
+			end
+			tagged.LocalTransparencyModifier = 1
+		elseif hiddenDecoyBalls[tagged] ~= nil then
+			tagged.LocalTransparencyModifier = hiddenDecoyBalls[tagged]
+			hiddenDecoyBalls[tagged] = nil
+		end
+		local strength = 0
+		if isBlindOne and ownRoot then
+			local distance = (tagged.Position - ownRoot.Position).Magnitude
+			local hearingRange = Config.ThrowImpactNoise * Config.NoiseCarry * 1.55
+			if distance <= hearingRange then
+				local fade = math.clamp((untilValue - serverNow) / 1.2, 0, 1)
+				strength = (0.55 + 0.45 * (1 - distance / hearingRange)) * fade
+			end
+		end
+		if strength > 0.02 then
+			local velocity = tagged.AssemblyLinearVelocity
+			local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
+			local excluded: { Instance } = { tagged, soundFigures, geometrySense }
+			if ownCharacter then
+				table.insert(excluded, ownCharacter)
+			end
+			rockGroundParams.FilterDescendantsInstances = excluded
+			local groundHit = workspace:Raycast(tagged.Position + Vector3.new(0, 5, 0), Vector3.new(0, -35, 0), rockGroundParams)
+			local desiredPosition = if groundHit
+				then Vector3.new(tagged.Position.X, groundHit.Position.Y + 2.55, tagged.Position.Z)
+				else tagged.Position + Vector3.new(0, 2.55, 0)
+			if not figure.position then
+				figure.position = desiredPosition
+			end
+			local currentPosition = figure.position :: Vector3
+			local flatDelta = Vector3.new(desiredPosition.X - currentPosition.X, 0, desiredPosition.Z - currentPosition.Z)
+			local fakeRunSpeed = math.min(Config.SprintSpeed - 1, 16)
+			local moving = flatDelta.Magnitude > 0.08
+			local direction = figure.direction or tagged.CFrame.LookVector
+			if moving then
+				direction = flatDelta.Unit
+				local step = math.min(flatDelta.Magnitude, fakeRunSpeed * dt)
+				currentPosition += direction * step
+			end
+			currentPosition = Vector3.new(
+				currentPosition.X,
+				currentPosition.Y + (desiredPosition.Y - currentPosition.Y) * math.min(1, dt * 10),
+				currentPosition.Z
+			)
+			figure.position = currentPosition
+			figure.direction = direction
+			poseEcho(
+				figure,
+				currentPosition,
+				direction,
+				if moving then fakeRunSpeed else math.min(flatVelocity.Magnitude, 3),
+				strength,
+				dt,
+				moving
+			)
+		else
+			hideEcho(figure)
+		end
+	end
+	for rock, figure in rockFigures do
+		if not seenRocks[rock] or not rock.Parent then
+			if rock.Parent and hiddenDecoyBalls[rock] ~= nil then
+				rock.LocalTransparencyModifier = hiddenDecoyBalls[rock]
+			end
+			hiddenDecoyBalls[rock] = nil
+			figure.model:Destroy()
+			rockFigures[rock] = nil
+		end
+	end
+
+	if not isBlindOne then
+		for part, original in hiddenParts do
+			if part.Parent then
+				part.LocalTransparencyModifier = original
+			end
+			hiddenParts[part] = nil
+		end
+		for humanoid, original in hiddenNameplates do
+			if humanoid.Parent then
+				humanoid.DisplayDistanceType = original
+			end
+			hiddenNameplates[humanoid] = nil
+		end
+		for rock, original in hiddenDecoyBalls do
+			if rock.Parent then
+				rock.LocalTransparencyModifier = original
+			end
+			hiddenDecoyBalls[rock] = nil
+		end
 	end
 end)

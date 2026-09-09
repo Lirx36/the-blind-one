@@ -3,6 +3,8 @@
 *.rbxlx
 *.rbxl.lock
 *.rbxlx.lock
+*.blend1
+__pycache__/
 
 /build/
 .DS_Store

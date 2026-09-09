@@ -420,6 +420,19 @@ local function addImportedMonster(visual: Model, character: Model): boolean
 		glow.Parent = eye
 	end
 
+	-- Imported rigs used to return before receiving the shadow aura. The lantern
+	-- controller darkens this overlay when its beam hits the creature, preserving
+	-- the frightening silhouette instead of washing the texture orange.
+	local aura = Instance.new("Highlight")
+	aura.Name = "DarkAura"
+	aura.Adornee = visual
+	aura.DepthMode = Enum.HighlightDepthMode.Occluded
+	aura.FillColor = Color3.fromRGB(0, 0, 0)
+	aura.FillTransparency = 0.88
+	aura.OutlineColor = Color3.fromRGB(125, 25, 18)
+	aura.OutlineTransparency = 0.22
+	aura.Parent = visual
+
 	return true
 end
 

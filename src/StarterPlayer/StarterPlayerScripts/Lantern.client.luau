@@ -5,8 +5,20 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
+local POINT_LIGHT_BRIGHTNESS = 2.7
+local BEAM_BRIGHTNESS = 4.7
+
+local oldDreadGrade = Lighting:FindFirstChild("LanternMonsterDreadGrade")
+if oldDreadGrade then
+	oldDreadGrade:Destroy()
+end
+local dreadGrade = Instance.new("ColorCorrectionEffect")
+dreadGrade.Name = "LanternMonsterDreadGrade"
+dreadGrade.Enabled = false
+dreadGrade.Parent = Lighting
 
 -- Clear placeholders left by an older live-synced version.
 for _, oldName in { "LanternView", "LanternGlow", "HeldLanternView" } do
@@ -111,7 +123,7 @@ makePart("HandleGrip", Vector3.new(0.8, 0.075, 0.09), darkMetal, Enum.Material.M
 local pointLight = Instance.new("PointLight")
 pointLight.Name = "WarmFill"
 pointLight.Color = Color3.fromRGB(255, 194, 118)
-pointLight.Brightness = 3.2
+pointLight.Brightness = POINT_LIGHT_BRIGHTNESS
 pointLight.Range = 24
 pointLight.Shadows = false
 pointLight.Parent = glow
@@ -119,7 +131,7 @@ pointLight.Parent = glow
 local beam = Instance.new("SpotLight")
 beam.Name = "ForwardBeam"
 beam.Color = Color3.fromRGB(255, 220, 170)
-beam.Brightness = 5.5
+beam.Brightness = BEAM_BRIGHTNESS
 beam.Range = 45
 beam.Angle = 96
 beam.Face = Enum.NormalId.Front
@@ -135,6 +147,13 @@ local function monsterInLanternBeam(camera: Camera): number
 		if not candidate then
 			return
 		end
+		local visual = candidate:FindFirstChild("BlindOneVisual")
+		local aura = visual and visual:FindFirstChild("DarkAura")
+		if aura and aura:IsA("Highlight") then
+			aura.FillColor = Color3.fromRGB(0, 0, 0)
+			aura.FillTransparency = 0.88
+			aura.OutlineTransparency = 0.22
+		end
 		local candidateRoot = candidate:FindFirstChild("HumanoidRootPart")
 		if not candidateRoot or not candidateRoot:IsA("BasePart") then
 			return
@@ -145,9 +164,16 @@ local function monsterInLanternBeam(camera: Camera): number
 			return
 		end
 		local facing = camera.CFrame.LookVector:Dot(offset.Unit)
-		local centered = math.clamp((facing - 0.42) / 0.5, 0, 1)
+		local centered = math.clamp((facing - 0.28) / 0.45, 0, 1)
 		local close = math.clamp(1 - distance / 42, 0, 1)
-		strongest = math.max(strongest, centered * close)
+		-- The creature absorbs the beam rather than turning orange and evenly lit.
+		-- Distance only slightly weakens the effect, preserving its black silhouette.
+		local shadow = if lightEnabled then centered * (0.84 + close * 0.16) else 0
+		strongest = math.max(strongest, shadow)
+		if aura and aura:IsA("Highlight") then
+			aura.FillTransparency = 0.88 - shadow * 0.64
+			aura.OutlineTransparency = 0.22 + shadow * 0.48
+		end
 	end
 
 	local aiMonster = Workspace:FindFirstChild("TheBlindOne")
@@ -217,8 +243,13 @@ RunService:BindToRenderStep("HeldLanternView", Enum.RenderPriority.Camera.Value 
 	-- The creature swallows nearby lantern light instead of becoming a bright
 	-- orange showroom model. The rest of the map keeps the full lantern range.
 	local shadowStrength = monsterInLanternBeam(camera)
-	pointLight.Brightness = 3.2 * (1 - shadowStrength * 0.78)
-	beam.Brightness = 5.5 * (1 - shadowStrength * 0.84)
+	pointLight.Brightness = POINT_LIGHT_BRIGHTNESS * (1 - shadowStrength * 0.94)
+	beam.Brightness = BEAM_BRIGHTNESS * (1 - shadowStrength * 0.985)
+	dreadGrade.Enabled = lightEnabled and shadowStrength > 0.015
+	dreadGrade.Brightness = -0.075 * shadowStrength
+	dreadGrade.Contrast = 0.14 * shadowStrength
+	dreadGrade.Saturation = -0.2 * shadowStrength
+	dreadGrade.TintColor = Color3.fromRGB(255, 255 - math.floor(18 * shadowStrength), 255 - math.floor(12 * shadowStrength))
 
 	local horizontalLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
 	if horizontalLook.Magnitude < 0.001 then

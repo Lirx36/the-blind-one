@@ -10,6 +10,7 @@ local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"))
 
 local rng = Random.new()
+local ORIGINAL_ANIMATE_ENABLED = "BlindOneOriginalAnimateEnabled"
 
 local function farMonsterSpawn(): Vector3?
 	local generatedMap = workspace:FindFirstChild("GeneratedMap")
@@ -53,7 +54,16 @@ end
 
 local function styleCharacter(player: Player, character: Model, moveToMonsterSpawn: boolean)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local animate = character:FindFirstChild("Animate")
 	if player:GetAttribute("Role") == "BlindOne" then
+		if animate and animate:IsA("LocalScript") then
+			if animate:GetAttribute(ORIGINAL_ANIMATE_ENABLED) == nil then
+				animate:SetAttribute(ORIGINAL_ANIMATE_ENABLED, animate.Enabled)
+			end
+			-- The monster has its own procedural limp. Leaving Roblox's stock walk
+			-- active makes the two gaits fight and the normal walk wins remotely.
+			animate.Enabled = false
+		end
 		addMonsterVisual(character)
 		if humanoid then
 			humanoid.WalkSpeed = Config.PlayerBlindOneSpeed
@@ -64,6 +74,13 @@ local function styleCharacter(player: Player, character: Model, moveToMonsterSpa
 			task.spawn(moveMonsterToFarSpawn, player, character)
 		end
 	else
+		if animate and animate:IsA("LocalScript") then
+			local originalEnabled = animate:GetAttribute(ORIGINAL_ANIMATE_ENABLED)
+			if typeof(originalEnabled) == "boolean" then
+				animate.Enabled = originalEnabled
+				animate:SetAttribute(ORIGINAL_ANIMATE_ENABLED, nil)
+			end
+		end
 		clearMonsterVisual(character)
 		if humanoid then
 			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer

@@ -189,7 +189,13 @@ local function spawnMonster()
 end
 
 ------------------------------------------------------------------- hearing model
-type Heard = { pos: Vector3, strength: number, at: number, player: Player? }
+type Heard = {
+	pos: Vector3,
+	strength: number,
+	at: number,
+	player: Player?,
+	arrivedAt: number?,
+}
 local heard: Heard? = nil
 
 local function registerNoise(pos: Vector3, loudness: number, player: Player?)
@@ -203,7 +209,13 @@ local function registerNoise(pos: Vector3, loudness: number, player: Player?)
 	end
 	-- the freshest sufficiently-strong sound wins; a much louder one always wins
 	if not heard or strength >= heard.strength - 4 or os.clock() - heard.at > 1.5 then
-		heard = { pos = pos, strength = strength, at = os.clock(), player = player }
+		heard = {
+			pos = pos,
+			strength = strength,
+			at = os.clock(),
+			player = player,
+			arrivedAt = nil,
+		}
 	end
 end
 
@@ -243,10 +255,6 @@ local function pollPlayers()
 			if typeof(meter) == "number" and meter > 0 then
 				registerNoise(hrp.Position, meter, player)
 			end
-			-- it can always feel something right next to it
-			if (hrp.Position - root.Position).Magnitude < Config.MonsterCatchDistance + 3 then
-				registerNoise(hrp.Position, 60, player)
-			end
 		end
 	end
 end
@@ -267,12 +275,33 @@ local function decide()
 		elseif state ~= "hunt" then
 			state = "investigate"
 		end
-		if state ~= "hunt" and age > Config.MonsterInvestigateTime then
-			heard = nil
-			state = "wander"
+
+		if state ~= "hunt" then
+			-- Investigation time starts when the monster actually reaches the
+			-- sound. Previously it expired while travelling, then resumed its old
+			-- patrol goal, which often looked like it remembered a silent player.
+			if distToHeard <= 4.5 then
+				if not heard.arrivedAt then
+					heard.arrivedAt = now
+				end
+				if now - (heard.arrivedAt :: number) >= Config.MonsterInvestigateTime then
+					heard = nil
+					state = "wander"
+					wanderGoal = nil
+				end
+			elseif age > Config.MonsterInvestigateTime + 12 then
+				-- Abandon an unreachable sound eventually instead of pursuing it
+				-- forever, but never resume a patrol target from before the sound.
+				heard = nil
+				state = "wander"
+				wanderGoal = nil
+			else
+				heard.arrivedAt = nil
+			end
 		end
 	elseif state ~= "wander" then
 		state = "wander"
+		wanderGoal = nil
 	end
 
 	if state == "hunt" or state == "investigate" then

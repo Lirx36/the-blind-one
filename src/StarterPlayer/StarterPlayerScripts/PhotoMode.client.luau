@@ -31,11 +31,13 @@ label.TextSize = 15
 label.Text = "Press P to freeze The Blind One for photos"
 label.Parent = gui
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed or UserInputService:GetFocusedTextBox() then
+UserInputService.InputBegan:Connect(function(input)
+	if UserInputService:GetFocusedTextBox() then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.P then
+	local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+	if input.KeyCode == Enum.KeyCode.P and not shiftHeld then
 		Remotes.PhotoMode:FireServer()
 	end
 end)
