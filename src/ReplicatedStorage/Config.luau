@@ -37,9 +37,7 @@ return {
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
 	PlayerBlindOneSpeed = 18,
 
-	-- Import assets/jumpscare/blind-one-jumpscare-safe-v2.png into this experience.
-	-- This name-based URL avoids copying a numeric asset id between computers.
-	JumpscareImage = "rbxgameasset://Images/blind-one-jumpscare-safe-v2",
+	-- The portrait is embedded in code, so it requires no cloud image asset.
 	JumpscareSound = "",
 
 	-- ---- round ----

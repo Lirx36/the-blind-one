@@ -91,24 +91,24 @@ Model-pass goals:
 - Replaced the red-flash placeholder with a full-screen kill sequence:
   - generated horror portrait support with zoom, jitter, chromatic split,
     static, vignette, red impact pulses, and blackout;
-  - live 3D clone of the killer when no uploaded portrait ID is configured;
-  - white-eyed fallback if neither image nor killer model is available;
+  - the moderation-safe portrait is palette-compressed into a Luau module and
+    reconstructed with `EditableImage`, requiring no upload or asset ID;
+  - the old live 3D monster fallback was removed completely;
+  - a white-eyed drawn fallback remains only if `EditableImage` is unavailable;
   - Studio-only `J` preview key.
 - The original v1 portrait was rejected by Roblox for violent content/gore and
   was removed. Replaced it with the non-graphic, white-eyed, sealed-mask image
   `assets/jumpscare/blind-one-jumpscare-safe-v2.png`.
-- Added `Config.JumpscareImage` and `Config.JumpscareSound`. The image uses the
-  experience-local URL `rbxgameasset://Images/blind-one-jumpscare-safe-v2`, so a
-  numeric ID is not required. It preloads safely and falls back to 3D if missing.
+- `assets/jumpscare/build_embedded_jumpscare.py` generates
+  `EmbeddedJumpscareImage.luau` at 384x216 with a 64-color palette. Keep the safe
+  PNG as the editable source and rerun the generator after future art changes.
+- `Config.JumpscareSound` remains available for a future uploaded stinger.
 - Catch events now forward the killer position to the client for reliable
   portrait selection.
 - `git diff --check` passed and Rojo 7.7.0 built the project successfully.
 
 ### Immediate next step
 
-Stop the playtest, ensure the place is published/connected to the intended
-experience, then use Studio's `File > Import` on
-`assets/jumpscare/blind-one-jumpscare-safe-v2.png`. The pictured warning rows are
-unrelated Toolbox model inventory entries. Restart the playtest and press `J`.
-Temporarily set `Config.StudioSafeMode = false` only when testing a real AI kill,
-then restore it to `true`.
+No image import is required. Build/open the latest project, restart the playtest,
+and press `J`. Temporarily set `Config.StudioSafeMode = false` only when testing
+a real AI kill, then restore it to `true`.

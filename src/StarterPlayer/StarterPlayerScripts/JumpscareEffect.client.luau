@@ -1,19 +1,18 @@
 --!strict
--- Death jumpscare: clone the killer into a private ViewportFrame and slam its
--- face toward the player. The portrait automatically follows future monster
--- model upgrades and has an asset-free fallback if no killer can be resolved.
+-- Death jumpscare using a palette-compressed portrait embedded in the place.
+-- No Roblox image upload or cloud asset permission is required.
 local Players = game:GetService("Players")
-local ContentProvider = game:GetService("ContentProvider")
+local AssetService = game:GetService("AssetService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local EmbeddedImage = require(script.Parent:WaitForChild("EmbeddedJumpscareImage"))
 
 -- Add an uploaded stinger later without changing the effect code. The visual
 -- jumpscare remains fully functional while this is empty.
-local SCARE_IMAGE = Config.JumpscareImage
 local SCARE_SOUND = Config.JumpscareSound
 local JUMPSCARE_DURATION = 1.05
 
@@ -34,33 +33,13 @@ black.BorderSizePixel = 0
 black.ZIndex = 1
 black.Parent = gui
 
-local viewport = Instance.new("ViewportFrame")
-viewport.Name = "KillerPortrait"
-viewport.Size = UDim2.fromScale(1, 1)
-viewport.BackgroundColor3 = Color3.fromRGB(2, 1, 3)
-viewport.BorderSizePixel = 0
-viewport.Ambient = Color3.fromRGB(38, 25, 29)
-viewport.LightColor = Color3.fromRGB(174, 199, 205)
-viewport.LightDirection = Vector3.new(-0.35, -0.15, -1)
-viewport.ZIndex = 2
-viewport.Parent = gui
-
-local world = Instance.new("WorldModel")
-world.Name = "JumpscareWorld"
-world.Parent = viewport
-
-local portraitCamera = Instance.new("Camera")
-portraitCamera.FieldOfView = 58
-portraitCamera.Parent = viewport
-viewport.CurrentCamera = portraitCamera
-
 local scareImage = Instance.new("ImageLabel")
 scareImage.Name = "UploadedJumpscareFace"
 scareImage.AnchorPoint = Vector2.new(0.5, 0.5)
 scareImage.Position = UDim2.fromScale(0.5, 0.5)
 scareImage.Size = UDim2.fromScale(1, 1)
 scareImage.BackgroundTransparency = 1
-scareImage.Image = SCARE_IMAGE
+scareImage.Image = ""
 scareImage.ScaleType = Enum.ScaleType.Crop
 scareImage.Visible = false
 scareImage.ZIndex = 3
@@ -87,13 +66,49 @@ cyanGhost.Parent = gui
 local cyanGhostScale = cyanGhost:FindFirstChildOfClass("UIScale") :: UIScale
 
 local imageReady = false
-if SCARE_IMAGE ~= "" then
-	task.spawn(function()
-		local loaded = pcall(function()
-			ContentProvider:PreloadAsync({ scareImage, redGhost, cyanGhost })
-		end)
-		imageReady = loaded and scareImage.IsLoaded
+local embeddedEditable: EditableImage? = nil
+do
+	local ok, result = pcall(function()
+		local created = AssetService:CreateEditableImage({
+			Size = Vector2.new(EmbeddedImage.Width, EmbeddedImage.Height),
+		})
+		if not created then
+			error("EditableImage memory budget exhausted")
+		end
+
+		local byteToPalette: { [number]: number } = {}
+		for index = 1, #EmbeddedImage.Alphabet do
+			byteToPalette[string.byte(EmbeddedImage.Alphabet, index)] = index
+		end
+		local pixels = buffer.create(EmbeddedImage.Width * EmbeddedImage.Height * 4)
+		for y, row in EmbeddedImage.Rows do
+			for x = 1, #row do
+				local paletteIndex = byteToPalette[string.byte(row, x)]
+				local packed = EmbeddedImage.Palette[paletteIndex]
+				local offset = (((y - 1) * EmbeddedImage.Width) + (x - 1)) * 4
+				buffer.writeu8(pixels, offset, bit32.rshift(packed, 16))
+				buffer.writeu8(pixels, offset + 1, bit32.band(bit32.rshift(packed, 8), 0xFF))
+				buffer.writeu8(pixels, offset + 2, bit32.band(packed, 0xFF))
+				buffer.writeu8(pixels, offset + 3, 0xFF)
+			end
+		end
+		created:WritePixelsBuffer(
+			Vector2.zero,
+			Vector2.new(EmbeddedImage.Width, EmbeddedImage.Height),
+			pixels
+		)
+		local content = Content.fromObject(created)
+		scareImage.ImageContent = content
+		redGhost.ImageContent = content
+		cyanGhost.ImageContent = content
+		return created
 	end)
+	if ok then
+		embeddedEditable = result :: EditableImage
+		imageReady = true
+	else
+		warn("Embedded jumpscare image could not be created:", result)
+	end
 end
 
 -- Used only if the killer disappears before the event reaches this client,
@@ -202,75 +217,6 @@ sound.PlaybackSpeed = 0.82
 sound.SoundId = SCARE_SOUND
 sound.Parent = gui
 
-local function killerCandidates(): { Model }
-	local candidates: { Model } = {}
-	local aiMonster = workspace:FindFirstChild("TheBlindOne")
-	if aiMonster and aiMonster:IsA("Model") then
-		table.insert(candidates, aiMonster)
-	end
-	for _, otherPlayer in Players:GetPlayers() do
-		local character = otherPlayer.Character
-		if otherPlayer ~= player and otherPlayer:GetAttribute("Role") == "BlindOne" and character then
-			table.insert(candidates, character)
-		end
-	end
-	return candidates
-end
-
-local function findKiller(sourcePosition: Vector3?): Model?
-	local best: Model? = nil
-	local bestDistance = math.huge
-	local victimRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local referencePosition = sourcePosition or (victimRoot and victimRoot.Position)
-	for _, candidate in killerCandidates() do
-		local root = candidate:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root then
-			local distance = if referencePosition then (root.Position - referencePosition).Magnitude else 0
-			if distance < bestDistance then
-				best = candidate
-				bestDistance = distance
-			end
-		end
-	end
-	return best
-end
-
-local function preparePortrait(sourcePosition: Vector3?): (BasePart?, Model?)
-	world:ClearAllChildren()
-	local source = findKiller(sourcePosition)
-	if not source then
-		return nil, nil
-	end
-
-	local ok, cloneResult = pcall(function()
-		return source:Clone()
-	end)
-	if not ok or not cloneResult or not cloneResult:IsA("Model") then
-		return nil, nil
-	end
-	local clone = cloneResult :: Model
-	clone.Name = "KillerClone"
-	for _, descendant in clone:GetDescendants() do
-		if descendant:IsA("LuaSourceContainer") or descendant:IsA("Sound") then
-			descendant:Destroy()
-		elseif descendant:IsA("BasePart") then
-			descendant.Anchored = true
-			descendant.CanCollide = false
-			descendant.CanTouch = false
-			descendant.CanQuery = false
-			descendant.LocalTransparencyModifier = 0
-		end
-	end
-	clone.Parent = world
-	local root = clone:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		clone:Destroy()
-		return nil, nil
-	end
-	clone:PivotTo(CFrame.new(0, 0, 0) * source:GetPivot().Rotation)
-	return root, clone
-end
-
 local activeSequence = 0
 
 local function resetStatic()
@@ -282,11 +228,8 @@ end
 local function playJumpscare(sourcePosition: Vector3?)
 	activeSequence += 1
 	local sequence = activeSequence
-	local portraitRoot, portraitModel = preparePortrait(sourcePosition)
-	local hasPortrait = portraitRoot ~= nil and portraitModel ~= nil
-	-- Moderation and experience permissions can delay an imported image. Never
-	-- trade the working 3D scare for a blank ImageLabel while that happens.
-	local hasUploadedImage = imageReady
+	local _sourcePosition = sourcePosition -- retained for remote compatibility
+	local hasUploadedImage = imageReady and embeddedEditable ~= nil
 
 	gui.Enabled = true
 	scareImage.Visible = hasUploadedImage
@@ -299,8 +242,7 @@ local function playJumpscare(sourcePosition: Vector3?)
 	cyanGhostScale.Scale = 0.92
 	redGhost.Position = UDim2.fromScale(0.494, 0.5)
 	cyanGhost.Position = UDim2.fromScale(0.506, 0.5)
-	viewport.Visible = not hasUploadedImage and hasPortrait
-	fallback.Visible = not hasUploadedImage and not hasPortrait
+	fallback.Visible = not hasUploadedImage
 	fallback.Position = UDim2.fromScale(0.5, 0.5)
 	fallback.Size = UDim2.fromScale(0.62, 0.62)
 	fallback.Rotation = 0
@@ -336,15 +278,6 @@ local function playJumpscare(sourcePosition: Vector3?)
 			cyanGhost.Position = UDim2.fromScale(0.5 + split, 0.5)
 			redGhost.Rotation = scareImage.Rotation - 0.5
 			cyanGhost.Rotation = scareImage.Rotation + 0.5
-		elseif portraitRoot and portraitModel and portraitModel.Parent then
-			local rootCFrame = portraitRoot.CFrame
-			local target = rootCFrame.Position + Vector3.new(0, 2.55, 0)
-			local distance = 5.4 + (1.05 - 5.4) * slam
-			local sideways = rootCFrame.RightVector * ((math.random() - 0.5) * jitter)
-			local vertical = Vector3.new(0, (math.random() - 0.5) * jitter, 0)
-			local cameraPosition = target + rootCFrame.LookVector * distance + sideways + vertical
-			portraitCamera.CFrame = CFrame.lookAt(cameraPosition, target + sideways * 0.2)
-				* CFrame.Angles(0, 0, math.rad((math.random() - 0.5) * 5 * slam))
 		else
 			local scale = 0.62 + slam * 1.18
 			fallback.Size = UDim2.fromScale(scale, scale)
@@ -373,7 +306,6 @@ local function playJumpscare(sourcePosition: Vector3?)
 	if sequence ~= activeSequence then
 		return
 	end
-	viewport.Visible = false
 	scareImage.Visible = false
 	redGhost.Visible = false
 	cyanGhost.Visible = false
@@ -389,7 +321,6 @@ local function playJumpscare(sourcePosition: Vector3?)
 		black.BackgroundTransparency = step / 10
 		RunService.RenderStepped:Wait()
 	end
-	world:ClearAllChildren()
 	gui.Enabled = false
 end
 
