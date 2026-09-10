@@ -294,3 +294,38 @@ death and respawn with no custom death screen or jumpscare.
 - Rojo build and `git diff --check` passed, producing
   `build/the-blind-one-town-test.rbxlx`. GitHub had no incoming laptop commits,
   and the correct Rojo server remained live on port 34872.
+
+### Settlement V2 scale, façade, and held-flashlight correction
+
+- The user approved the town direction but reported that V1 felt small, the
+  building façades were much flatter than the reference game, and the first
+  flashlight floated as a huge glowing object instead of sitting in the hand.
+- Expanded the generated world from 440x440 to 760x760 studs. V2 now has a
+  full-length main street, long cross street, north and south district roads,
+  and two parallel avenues, all with their own sidewalks and faded markings.
+- Added eleven outer-district buildings, bringing the town to multiple distinct
+  blocks: power station, water works, telephone exchange, grocery, cinema, fire
+  station, two residence blocks, foundry, bus depot, and church. Added more
+  streetlights, utility poles/wires, cars, reflective puddles, and boundary
+  vegetation throughout the expanded area.
+- Spread survivor spawn, final perimeter gate, all three mechanisms, patrol
+  nodes, and throwable rocks across the expanded town so the extra scale is
+  part of the actual objective route instead of empty scenery.
+- Upgraded every generated façade with window sills, vertical/horizontal metal
+  mullions, deeper framing, nine-strip rain awnings, and additional roof detail.
+  Added two proper glass storefronts with lit interiors, shelves, framed panels,
+  and physical `OPEN ALL NIGHT` posters to approach the reference's layered
+  background-building look without relying on uploaded marketplace assets.
+- Rebuilt the flashlight around the last proven lantern hand-tracking logic.
+  The pivot now follows the actual right hand, falls back to a safe camera-hand
+  position only for unusual avatars, lowers with the hand when looking down,
+  and uses direct movement bob/roll without sideways lag. The correctly scaled
+  model has a rubber grip, metal barrel, tail cap, expanded head, bezel, glass
+  lens, switch, and six grip ribs. The lens is no longer Neon, preventing the
+  giant white bloom disc seen in V1.
+- The narrow shadow-casting hotspot and softer spill now originate from the held
+  lens and aim along the full camera look vector, so illumination follows the
+  crosshair vertically and horizontally.
+- GitHub had no incoming laptop changes. Rojo build and `git diff --check`
+  passed, producing `build/the-blind-one-town-v2-test.rbxlx`; the correct Rojo
+  server remained live on port 34872.

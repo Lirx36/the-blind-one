@@ -1,16 +1,16 @@
 --!strict
--- Camera-aimed survivor flashlight. The narrow hotspot and wide spill light the
--- exact point the player looks at while the viewmodel retains a little hand sway.
+-- Hand-tracked survivor flashlight. It uses the old lantern's proven hand-first
+-- positioning, but aims both the prop and its light at the camera crosshair.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 
-local obsoleteGrade = game:GetService("Lighting"):FindFirstChild("LanternMonsterDreadGrade")
+local obsoleteGrade = Lighting:FindFirstChild("LanternMonsterDreadGrade")
 if obsoleteGrade then obsoleteGrade:Destroy() end
-
 for _, oldName in { "LanternView", "LanternGlow", "HeldLanternView", "HeldFlashlightView" } do
 	local old = Workspace:FindFirstChild(oldName)
 	if old then old:Destroy() end
@@ -20,110 +20,137 @@ local flashlight = Instance.new("Model")
 flashlight.Name = "HeldFlashlightView"
 flashlight.Parent = Workspace
 
-type ViewPart = { part: Part, localCFrame: CFrame }
-local viewParts: { ViewPart } = {}
+local root = Instance.new("Part")
+root.Name = "ViewRoot"
+root.Size = Vector3.new(0.04, 0.04, 0.04)
+root.Transparency = 1
+root.Anchored = true
+root.CanCollide, root.CanTouch, root.CanQuery, root.CastShadow = false, false, false, false
+root.CFrame = CFrame.identity
+root.Parent = flashlight
+flashlight.PrimaryPart = root
 
 local function makePart(name: string, size: Vector3, color: Color3, material: Enum.Material, localCFrame: CFrame, shape: Enum.PartType?, transparency: number?): Part
 	local object = Instance.new("Part")
-	object.Name = name
-	object.Size = size
-	object.Color = color
-	object.Material = material
-	object.Shape = shape or Enum.PartType.Block
-	object.Transparency = transparency or 0
+	object.Name, object.Size, object.Color, object.Material = name, size, color, material
+	object.Shape, object.Transparency = shape or Enum.PartType.Block, transparency or 0
 	object.Anchored = true
-	object.CanCollide = false
-	object.CanTouch = false
-	object.CanQuery = false
-	object.CastShadow = false
+	object.CanCollide, object.CanTouch, object.CanQuery, object.CastShadow = false, false, false, false
+	object.CFrame = localCFrame
 	object.Parent = flashlight
-	table.insert(viewParts, { part = object, localCFrame = localCFrame })
 	return object
 end
 
-local root = makePart("ViewRoot", Vector3.new(0.05, 0.05, 0.05), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, CFrame.identity, nil, 1)
-flashlight.PrimaryPart = root
+local blackMetal = Color3.fromRGB(20, 23, 25)
+local edgeMetal = Color3.fromRGB(55, 62, 65)
+local rubber = Color3.fromRGB(13, 15, 16)
+local axisForward = CFrame.Angles(0, math.rad(90), 0)
 
--- Dark, compact metal flashlight matching the reference silhouette.
-makePart("Grip", Vector3.new(1.05, 0.34, 0.34), Color3.fromRGB(23, 27, 29), Enum.Material.Metal, CFrame.new(0.67, -0.63, -1.05) * CFrame.Angles(0, math.rad(90), math.rad(-8)), Enum.PartType.Cylinder)
-makePart("GripBandsA", Vector3.new(0.12, 0.39, 0.39), Color3.fromRGB(49, 54, 56), Enum.Material.Metal, CFrame.new(0.42, -0.59, -1.0) * CFrame.Angles(0, math.rad(90), math.rad(-8)), Enum.PartType.Cylinder)
-makePart("GripBandsB", Vector3.new(0.12, 0.39, 0.39), Color3.fromRGB(49, 54, 56), Enum.Material.Metal, CFrame.new(0.82, -0.69, -1.11) * CFrame.Angles(0, math.rad(90), math.rad(-8)), Enum.PartType.Cylinder)
-makePart("Head", Vector3.new(0.43, 0.62, 0.62), Color3.fromRGB(31, 36, 38), Enum.Material.Metal, CFrame.new(0.2, -0.53, -0.94) * CFrame.Angles(0, math.rad(90), math.rad(-8)), Enum.PartType.Cylinder)
-local lens = makePart("Lens", Vector3.new(0.08, 0.52, 0.52), Color3.fromRGB(205, 220, 223), Enum.Material.Glass, CFrame.new(-0.015, -0.475, -0.885) * CFrame.Angles(0, math.rad(90), math.rad(-8)), Enum.PartType.Cylinder, 0.18)
-makePart("Switch", Vector3.new(0.22, 0.09, 0.18), Color3.fromRGB(67, 72, 72), Enum.Material.Metal, CFrame.new(0.56, -0.44, -0.96) * CFrame.Angles(0, 0, math.rad(-8)))
+-- Pivot sits inside the player's palm. The body extends forward along local -Z.
+makePart("RubberGrip", Vector3.new(0.9, 0.34, 0.34), rubber, Enum.Material.Rubber, CFrame.new(0, 0, 0.08) * axisForward, Enum.PartType.Cylinder)
+makePart("MainBarrel", Vector3.new(0.92, 0.3, 0.3), blackMetal, Enum.Material.Metal, CFrame.new(0, 0, -0.48) * axisForward, Enum.PartType.Cylinder)
+makePart("TailCap", Vector3.new(0.13, 0.4, 0.4), edgeMetal, Enum.Material.Metal, CFrame.new(0, 0, 0.56) * axisForward, Enum.PartType.Cylinder)
+makePart("Head", Vector3.new(0.32, 0.58, 0.58), blackMetal, Enum.Material.Metal, CFrame.new(0, 0, -1.08) * axisForward, Enum.PartType.Cylinder)
+makePart("Bezel", Vector3.new(0.12, 0.67, 0.67), edgeMetal, Enum.Material.Metal, CFrame.new(0, 0, -1.29) * axisForward, Enum.PartType.Cylinder)
+local lens = makePart("Lens", Vector3.new(0.045, 0.55, 0.55), Color3.fromRGB(172, 189, 193), Enum.Material.Glass, CFrame.new(0, 0, -1.38) * axisForward, Enum.PartType.Cylinder, 0.24)
+makePart("Switch", Vector3.new(0.2, 0.09, 0.18), Color3.fromRGB(91, 99, 101), Enum.Material.Metal, CFrame.new(0, 0.2, -0.38))
 
--- Lights are parented to an invisible camera-facing emitter rather than the
--- angled viewmodel, making the illumination land exactly on the crosshair.
-local emitter = makePart("BeamEmitter", Vector3.new(0.06, 0.06, 0.06), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, CFrame.new(0.16, -0.18, -0.45), nil, 1)
+for index = 1, 6 do
+	makePart("GripRib", Vector3.new(0.045, 0.38, 0.38), edgeMetal, Enum.Material.Metal, CFrame.new(0, 0, 0.42 - index * 0.13) * axisForward, Enum.PartType.Cylinder)
+end
 
 local hotspot = Instance.new("SpotLight")
-hotspot.Name = "Hotspot"
+hotspot.Name = "FocusedHotspot"
 hotspot.Face = Enum.NormalId.Front
-hotspot.Color = Color3.fromRGB(222, 231, 232)
-hotspot.Brightness = 7.2
-hotspot.Range = 76
-hotspot.Angle = 54
+hotspot.Color = Color3.fromRGB(222, 230, 231)
+hotspot.Brightness = 6.4
+hotspot.Range = 82
+hotspot.Angle = 48
 hotspot.Shadows = true
-hotspot.Parent = emitter
+hotspot.Parent = lens
 
 local spill = Instance.new("SpotLight")
-spill.Name = "WideSpill"
+spill.Name = "SoftSpill"
 spill.Face = Enum.NormalId.Front
-spill.Color = Color3.fromRGB(194, 209, 212)
-spill.Brightness = 2.4
-spill.Range = 49
-spill.Angle = 104
+spill.Color = Color3.fromRGB(188, 202, 205)
+spill.Brightness = 1.8
+spill.Range = 52
+spill.Angle = 92
 spill.Shadows = false
-spill.Parent = emitter
+spill.Parent = lens
 
 local nearFill = Instance.new("PointLight")
 nearFill.Name = "NearFill"
-nearFill.Color = Color3.fromRGB(188, 204, 207)
-nearFill.Brightness = 0.52
-nearFill.Range = 12
+nearFill.Color = Color3.fromRGB(184, 197, 200)
+nearFill.Brightness = 0.26
+nearFill.Range = 7
 nearFill.Shadows = false
-nearFill.Parent = emitter
+nearFill.Parent = lens
 
+local rightHand: BasePart? = nil
 local lightEnabled = true
-local sway = Vector2.zero
-local lastCameraCFrame: CFrame? = nil
 
-local function setEnabled(enabled: boolean)
-	lightEnabled = enabled
-	hotspot.Enabled = enabled
-	spill.Enabled = enabled
-	nearFill.Enabled = enabled
-	lens.Material = if enabled then Enum.Material.Neon else Enum.Material.Glass
-	lens.Color = if enabled then Color3.fromRGB(221, 233, 235) else Color3.fromRGB(56, 65, 67)
+local function findRightHand(character: Model)
+	local candidate = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+	rightHand = if candidate and candidate:IsA("BasePart") then candidate else nil
+	if not rightHand then
+		task.spawn(function()
+			local later = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
+			if later and later:IsA("BasePart") and player.Character == character then rightHand = later end
+		end)
+	end
 end
 
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed or UserInputService:GetFocusedTextBox() then return end
-	if input.KeyCode == Enum.KeyCode.F and player:GetAttribute("Role") ~= "BlindOne" then
-		setEnabled(not lightEnabled)
-	end
+if player.Character then findRightHand(player.Character) end
+player.CharacterAdded:Connect(function(character)
+	rightHand = nil
+	findRightHand(character)
 end)
 
-RunService:BindToRenderStep("TheHollowFlashlight", Enum.RenderPriority.Camera.Value + 2, function(deltaTime)
+local function applyLightState()
+	hotspot.Enabled, spill.Enabled, nearFill.Enabled = lightEnabled, lightEnabled, lightEnabled
+	lens.Material = Enum.Material.Glass
+	lens.Transparency = if lightEnabled then 0.18 else 0.46
+	lens.Color = if lightEnabled then Color3.fromRGB(185, 201, 204) else Color3.fromRGB(45, 53, 55)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if not gameProcessed and not UserInputService:GetFocusedTextBox() and input.KeyCode == Enum.KeyCode.F and player:GetAttribute("Role") ~= "BlindOne" then
+		lightEnabled = not lightEnabled
+		applyLightState()
+	end
+end)
+applyLightState()
+
+RunService:BindToRenderStep("HeldFlashlightView", Enum.RenderPriority.Camera.Value + 2, function()
+	if player:GetAttribute("Role") == "BlindOne" then
+		if flashlight.Parent then flashlight.Parent = nil end
+		return
+	elseif not flashlight.Parent then
+		flashlight.Parent = Workspace
+	end
+
 	local camera = Workspace.CurrentCamera
-	if not camera then return end
-	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
-	flashlight.Parent = if isBlindOne then nil else Workspace
-	if isBlindOne then return end
+	local hand = rightHand
+	if not camera or not hand or not hand.Parent then return end
 
-	local cameraCFrame = camera.CFrame
-	if lastCameraCFrame then
-		local relative = lastCameraCFrame:ToObjectSpace(cameraCFrame)
-		local x, y = relative:ToOrientation()
-		local target = Vector2.new(math.clamp(-y * 2.8, -0.08, 0.08), math.clamp(-x * 2.3, -0.07, 0.07))
-		sway = sway:Lerp(target, math.clamp(deltaTime * 8, 0, 1))
-	end
-	lastCameraCFrame = cameraCFrame
-	local breathing = math.sin(os.clock() * 1.55) * 0.008
-	local viewCFrame = cameraCFrame * CFrame.Angles(sway.Y + breathing, sway.X, sway.X * 0.25)
-	for _, entry in viewParts do
-		entry.part.CFrame = viewCFrame * entry.localCFrame
-	end
+	local lookDown = math.clamp(-camera.CFrame.LookVector.Y, 0, 1)
+	local handDepth = (hand.Position - camera.CFrame.Position):Dot(camera.CFrame.LookVector)
+	local handCenter = hand.Position + camera.CFrame.LookVector * 0.22 - camera.CFrame.UpVector * (0.05 + 0.08 * lookDown)
+	local cameraCenter = (camera.CFrame * CFrame.new(0.7, -0.54 - 0.2 * lookDown, -1.35)).Position
+	-- Normal avatars use the real hand. The fallback prevents unusual rigs from
+	-- putting the prop behind the camera while keeping it on the right-hand side.
+	local center = if handDepth > 0.18 then handCenter:Lerp(cameraCenter, 0.2) else cameraCenter
+
+	local movement = 0
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then movement = math.clamp(humanoid.MoveDirection.Magnitude, 0, 1) end
+	local walkClock = os.clock() * 8.2
+	local bob = camera.CFrame.UpVector * (math.sin(walkClock * 2) * 0.018 * movement)
+		+ camera.CFrame.RightVector * (math.sin(walkClock) * 0.025 * movement)
+	local roll = math.rad(math.sin(walkClock) * 1.4 * movement)
+	local target = CFrame.lookAt(center + bob, center + bob + camera.CFrame.LookVector, camera.CFrame.UpVector) * CFrame.Angles(0, 0, roll)
+	-- Direct hand tracking prevents the sideways trailing seen with extra easing.
+	flashlight:PivotTo(target)
 end)
-
-setEnabled(true)
