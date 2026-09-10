@@ -27,46 +27,23 @@ type LightingState = {
 	brightness: number,
 	ambient: Color3,
 	outdoorAmbient: Color3,
-	diffuseScale: number,
-	specularScale: number,
-	globalShadows: boolean,
-	shadowSoftness: number,
 	fogColor: Color3,
 	fogStart: number,
 	fogEnd: number,
 	exposure: number,
-	effects: { [Instance]: boolean },
 	atmospheres: { [Atmosphere]: AtmosphereState },
 }
 
 local savedLighting: LightingState? = nil
-
-local function setPostEffectEnabled(effect: Instance, enabled: boolean)
-	if effect:IsA("BloomEffect")
-		or effect:IsA("BlurEffect")
-		or effect:IsA("ColorCorrectionEffect")
-		or effect:IsA("DepthOfFieldEffect")
-		or effect:IsA("SunRaysEffect") then
-		effect.Enabled = enabled
-	end
-end
 
 local function enableInspectionLighting()
 	if savedLighting then
 		return
 	end
 
-	local effects: { [Instance]: boolean } = {}
 	local atmospheres: { [Atmosphere]: AtmosphereState } = {}
 	for _, effect in Lighting:GetChildren() do
-		if effect:IsA("BloomEffect")
-			or effect:IsA("BlurEffect")
-			or effect:IsA("ColorCorrectionEffect")
-			or effect:IsA("DepthOfFieldEffect")
-			or effect:IsA("SunRaysEffect") then
-			effects[effect] = effect.Enabled
-			effect.Enabled = false
-		elseif effect:IsA("Atmosphere") then
+		if effect:IsA("Atmosphere") then
 			atmospheres[effect] = {
 				density = effect.Density,
 				haze = effect.Haze,
@@ -78,9 +55,6 @@ local function enableInspectionLighting()
 			effect.Density = 0
 			effect.Haze = 0
 			effect.Glare = 0
-			effect.Offset = 0
-			effect.Color = Color3.new(1, 1, 1)
-			effect.Decay = Color3.new(1, 1, 1)
 		end
 	end
 
@@ -89,32 +63,24 @@ local function enableInspectionLighting()
 		brightness = Lighting.Brightness,
 		ambient = Lighting.Ambient,
 		outdoorAmbient = Lighting.OutdoorAmbient,
-		diffuseScale = Lighting.EnvironmentDiffuseScale,
-		specularScale = Lighting.EnvironmentSpecularScale,
-		globalShadows = Lighting.GlobalShadows,
-		shadowSoftness = Lighting.ShadowSoftness,
 		fogColor = Lighting.FogColor,
 		fogStart = Lighting.FogStart,
 		fogEnd = Lighting.FogEnd,
 		exposure = Lighting.ExposureCompensation,
-		effects = effects,
 		atmospheres = atmospheres,
 	}
 
-	-- Local-only neutral daylight for examining the procedural character. These
-	-- values never replicate to the server or alter normal gameplay lighting.
+	-- Photo mode changes only visibility: bright daylight removes the darkness
+	-- and Atmosphere/Fog are cleared above. Bloom, depth of field, color grade,
+	-- Future lighting, wet reflections, shadows, and weather remain untouched.
 	Lighting.ClockTime = 13.5
-	Lighting.Brightness = 4
-	Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-	Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 1
-	Lighting.GlobalShadows = false
-	Lighting.ShadowSoftness = 0
+	Lighting.Brightness = 3.1
+	Lighting.Ambient = Color3.fromRGB(142, 150, 153)
+	Lighting.OutdoorAmbient = Color3.fromRGB(164, 174, 178)
 	Lighting.FogColor = Color3.fromRGB(235, 238, 240)
 	Lighting.FogStart = 100000
 	Lighting.FogEnd = 100001
-	Lighting.ExposureCompensation = 1.15
+	Lighting.ExposureCompensation = 0.72
 end
 
 local function restoreGameplayLighting()
@@ -128,20 +94,11 @@ local function restoreGameplayLighting()
 	Lighting.Brightness = state.brightness
 	Lighting.Ambient = state.ambient
 	Lighting.OutdoorAmbient = state.outdoorAmbient
-	Lighting.EnvironmentDiffuseScale = state.diffuseScale
-	Lighting.EnvironmentSpecularScale = state.specularScale
-	Lighting.GlobalShadows = state.globalShadows
-	Lighting.ShadowSoftness = state.shadowSoftness
 	Lighting.FogColor = state.fogColor
 	Lighting.FogStart = state.fogStart
 	Lighting.FogEnd = state.fogEnd
 	Lighting.ExposureCompensation = state.exposure
 
-	for effect, enabled in state.effects do
-		if effect.Parent then
-			setPostEffectEnabled(effect, enabled)
-		end
-	end
 	for atmosphere, atmosphereState in state.atmospheres do
 		if atmosphere.Parent then
 			atmosphere.Density = atmosphereState.density
@@ -185,13 +142,14 @@ UserInputService.InputBegan:Connect(function(input)
 end)
 
 Remotes.PhotoMode.OnClientEvent:Connect(function(frozen: boolean)
+	player:SetAttribute("PhotoModeActive", frozen)
 	if frozen then
 		enableInspectionLighting()
 	else
 		restoreGameplayLighting()
 	end
 	label.Text = if frozen
-		then "PHOTO MODE — FULL INSPECTION LIGHT  •  P TO RESUME"
+		then "PHOTO MODE — CLEAR DAYLIGHT / CINEMATIC GRAPHICS ON  •  P TO RESUME"
 		else "PHOTO MODE OFF — THE BLIND ONE IS MOVING  •  P TO FREEZE"
 	label.TextColor3 = if frozen then Color3.fromRGB(190, 235, 245) else Color3.fromRGB(225, 235, 238)
 end)

@@ -5,7 +5,7 @@
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
-        "Technology": "ShadowMap"
+        "Technology": "Future"
       }
     },
     "ReplicatedStorage": {

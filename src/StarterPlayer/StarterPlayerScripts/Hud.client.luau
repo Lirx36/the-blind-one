@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 
@@ -47,17 +48,91 @@ vignette.BorderSizePixel = 0
 vignette.ZIndex = 5
 vignette.Parent = gui
 
--- objective
+-- Survivor objective: a restrained analog-horror title card that reads cleanly
+-- against both fog and darkness without feeling like a modern quest tracker.
+local objectiveBanner = Instance.new("CanvasGroup")
+objectiveBanner.Name = "ObjectiveBanner"
+objectiveBanner.AnchorPoint = Vector2.new(0.5, 0)
+objectiveBanner.Position = UDim2.new(0.5, 0, 0, 16)
+objectiveBanner.Size = UDim2.fromOffset(560, 104)
+objectiveBanner.BackgroundColor3 = Color3.fromRGB(6, 9, 11)
+objectiveBanner.BackgroundTransparency = 0.72
+objectiveBanner.BorderSizePixel = 0
+objectiveBanner.GroupTransparency = 0
+objectiveBanner.Parent = gui
+
+local bannerGradient = Instance.new("UIGradient")
+bannerGradient.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.2, 0.22),
+	NumberSequenceKeypoint.new(0.5, 0.05),
+	NumberSequenceKeypoint.new(0.8, 0.22),
+	NumberSequenceKeypoint.new(1, 1),
+})
+bannerGradient.Parent = objectiveBanner
+
+local objectiveEyebrow = Instance.new("TextLabel")
+objectiveEyebrow.Position = UDim2.fromOffset(0, 7)
+objectiveEyebrow.Size = UDim2.new(1, 0, 0, 15)
+objectiveEyebrow.BackgroundTransparency = 1
+objectiveEyebrow.Font = Enum.Font.GothamMedium
+objectiveEyebrow.Text = "THE HOLLOW  /  SURVIVOR DIRECTIVE"
+objectiveEyebrow.TextSize = 9
+objectiveEyebrow.TextColor3 = Color3.fromRGB(145, 163, 169)
+objectiveEyebrow.TextTransparency = 0.13
+objectiveEyebrow.Parent = objectiveBanner
+
+local objectiveTitle = Instance.new("TextLabel")
+objectiveTitle.Position = UDim2.fromOffset(0, 18)
+objectiveTitle.Size = UDim2.new(1, 0, 0, 39)
+objectiveTitle.BackgroundTransparency = 1
+objectiveTitle.Font = Enum.Font.Garamond
+objectiveTitle.Text = "OBJECTIVE"
+objectiveTitle.TextSize = 31
+objectiveTitle.TextColor3 = Color3.fromRGB(235, 238, 235)
+objectiveTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+objectiveTitle.TextStrokeTransparency = 0.25
+objectiveTitle.Parent = objectiveBanner
+
+local objectiveRule = Instance.new("Frame")
+objectiveRule.AnchorPoint = Vector2.new(0.5, 0)
+objectiveRule.Position = UDim2.new(0.5, 0, 0, 56)
+objectiveRule.Size = UDim2.fromOffset(390, 2)
+objectiveRule.BackgroundColor3 = Color3.fromRGB(211, 221, 220)
+objectiveRule.BackgroundTransparency = 0.18
+objectiveRule.BorderSizePixel = 0
+objectiveRule.Parent = objectiveBanner
+local ruleGradient = Instance.new("UIGradient")
+ruleGradient.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.18, 0.35),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(0.82, 0.35),
+	NumberSequenceKeypoint.new(1, 1),
+})
+ruleGradient.Parent = objectiveRule
+
+local objectiveMark = Instance.new("Frame")
+objectiveMark.AnchorPoint = Vector2.new(0.5, 0.5)
+objectiveMark.Position = UDim2.fromScale(0.5, 0.5)
+objectiveMark.Size = UDim2.fromOffset(7, 7)
+objectiveMark.Rotation = 45
+objectiveMark.BackgroundColor3 = Color3.fromRGB(226, 232, 230)
+objectiveMark.BorderSizePixel = 0
+objectiveMark.Parent = objectiveRule
+
 local objective = Instance.new("TextLabel")
-objective.Size = UDim2.new(1, 0, 0, 30)
-objective.Position = UDim2.new(0, 0, 0, 24)
+objective.Position = UDim2.fromOffset(34, 64)
+objective.Size = UDim2.new(1, -68, 0, 30)
 objective.BackgroundTransparency = 1
-objective.Font = Enum.Font.GothamMedium
-objective.TextSize = 18
-objective.TextColor3 = Color3.fromRGB(230, 230, 235)
-objective.TextStrokeTransparency = 0.5
-objective.Text = ""
-objective.Parent = gui
+objective.Font = Enum.Font.Garamond
+objective.TextSize = 17
+objective.TextColor3 = Color3.fromRGB(220, 225, 222)
+objective.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+objective.TextStrokeTransparency = 0.52
+objective.TextWrapped = true
+objective.Text = "Awaiting directive..."
+objective.Parent = objectiveBanner
 
 -- bottom stack: noise meter + stamina
 local panel = Instance.new("Frame")
@@ -253,7 +328,7 @@ end
 local progressPanel = Instance.new("Frame")
 progressPanel.Name = "GateProgress"
 progressPanel.AnchorPoint = Vector2.new(0.5, 0)
-progressPanel.Position = UDim2.new(0.5, 0, 0, 58)
+progressPanel.Position = UDim2.new(0.5, 0, 0, 126)
 progressPanel.Size = UDim2.fromOffset(196, 30)
 progressPanel.BackgroundColor3 = Color3.fromRGB(7, 10, 10)
 progressPanel.BackgroundTransparency = 0.30
@@ -321,6 +396,21 @@ end)
 
 Remotes.Objective.OnClientEvent:Connect(function(text: string)
 	objective.Text = text
+	if player:GetAttribute("Role") ~= "BlindOne" then
+		objectiveBanner.Position = UDim2.new(0.5, 0, 0, 5)
+		objectiveBanner.GroupTransparency = 1
+		TweenService:Create(
+			objectiveBanner,
+			TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+			{ Position = UDim2.new(0.5, 0, 0, 16), GroupTransparency = 0 }
+		):Play()
+		objectiveRule.Size = UDim2.fromOffset(16, 2)
+		TweenService:Create(
+			objectiveRule,
+			TweenInfo.new(0.75, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+			{ Size = UDim2.fromOffset(390, 2) }
+		):Play()
+	end
 end)
 
 Remotes.HeldCount.OnClientEvent:Connect(function(n: number)
@@ -329,6 +419,8 @@ end)
 
 RunService.RenderStepped:Connect(function()
 	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
+	local isPhotoMode = player:GetAttribute("PhotoModeActive") == true
+	objectiveBanner.Visible = not isBlindOne
 	panel.Visible = not isBlindOne
 	controlsPanel.Visible = not isBlindOne
 	rockSlot.Visible = not isBlindOne
@@ -346,7 +438,7 @@ RunService.RenderStepped:Connect(function()
 
 	-- dread overlay: base darkness + pulse
 	local pulse = dread > 0.15 and (math.sin(os.clock() * (6 + dread * 10)) * 0.5 + 0.5) * dread * 0.3 or 0
-	vignette.BackgroundTransparency = if isBlindOne
+	vignette.BackgroundTransparency = if isBlindOne or isPhotoMode
 		then 1
 		else math.clamp(1 - (dread * 0.6 + pulse), 0.3, 1)
 end)

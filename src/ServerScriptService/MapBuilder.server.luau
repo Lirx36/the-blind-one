@@ -5,7 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local MAP_VERSION = "TheHollow_2"
+local MAP_VERSION = "TheHollow_3"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
 if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then
 	return
@@ -91,19 +91,24 @@ end
 pcall(function()
 	(Lighting :: any).Technology = Enum.Technology.Future
 end)
-Lighting.ClockTime = 1.35
-Lighting.Brightness = 0.9
-Lighting.Ambient = Color3.fromRGB(20, 23, 24)
-Lighting.OutdoorAmbient = Color3.fromRGB(12, 15, 16)
-Lighting.EnvironmentDiffuseScale = 0.14
-Lighting.EnvironmentSpecularScale = 0.05
+Lighting.ClockTime = 2.15
+Lighting.Brightness = 1.15
+Lighting.Ambient = Color3.fromRGB(24, 28, 31)
+Lighting.OutdoorAmbient = Color3.fromRGB(15, 20, 23)
+Lighting.EnvironmentDiffuseScale = 0.22
+Lighting.EnvironmentSpecularScale = 0.72
 Lighting.GlobalShadows = true
-Lighting.FogColor = Color3.fromRGB(10, 14, 15)
-Lighting.FogStart = 34
-Lighting.FogEnd = 180
+Lighting.ShadowSoftness = 0.48
+Lighting.ExposureCompensation = -0.28
+Lighting.FogColor = Color3.fromRGB(32, 39, 43)
+Lighting.FogStart = 22
+Lighting.FogEnd = 142
 
 for _, effect in Lighting:GetChildren() do
-	if effect.Name == "TheHollowGrade" or effect.Name == "TheHollowAtmosphere" then
+	if effect.Name == "TheHollowGrade"
+		or effect.Name == "TheHollowAtmosphere"
+		or effect.Name == "TheHollowBloom"
+		or effect.Name == "TheHollowDepth" then
 		effect:Destroy()
 	elseif effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") then
 		effect.Enabled = false
@@ -114,21 +119,36 @@ end
 
 local grade = Instance.new("ColorCorrectionEffect")
 grade.Name = "TheHollowGrade"
-grade.Brightness = 0.015
-grade.Contrast = 0.10
-grade.Saturation = -0.20
-grade.TintColor = Color3.fromRGB(194, 211, 207)
+grade.Brightness = -0.025
+grade.Contrast = 0.24
+grade.Saturation = -0.48
+grade.TintColor = Color3.fromRGB(190, 207, 211)
 grade.Parent = Lighting
 
 local atmosphere = Instance.new("Atmosphere")
 atmosphere.Name = "TheHollowAtmosphere"
-atmosphere.Color = Color3.fromRGB(55, 68, 65)
-atmosphere.Decay = Color3.fromRGB(12, 17, 18)
-atmosphere.Density = 0.12
-atmosphere.Haze = 0.5
+atmosphere.Color = Color3.fromRGB(86, 99, 103)
+atmosphere.Decay = Color3.fromRGB(17, 24, 28)
+atmosphere.Density = 0.36
+atmosphere.Haze = 2.15
 atmosphere.Glare = 0
-atmosphere.Offset = -0.15
+atmosphere.Offset = -0.22
 atmosphere.Parent = Lighting
+
+local bloom = Instance.new("BloomEffect")
+bloom.Name = "TheHollowBloom"
+bloom.Intensity = 0.24
+bloom.Size = 38
+bloom.Threshold = 1.12
+bloom.Parent = Lighting
+
+local depth = Instance.new("DepthOfFieldEffect")
+depth.Name = "TheHollowDepth"
+depth.FarIntensity = 0.13
+depth.FocusDistance = 52
+depth.InFocusRadius = 38
+depth.NearIntensity = 0.025
+depth.Parent = Lighting
 
 --------------------------------------------------------------------- ground and routes
 part({
@@ -158,12 +178,37 @@ local function pathStrip(a: Vector3, b: Vector3, width: number)
 		CFrame = CFrame.lookAt(midpoint + Vector3.new(0, 0.05, 0), b),
 		Color = Color3.fromRGB(39, 32, 24),
 		Material = Enum.Material.Mud,
+		Reflectance = 0.08,
 		CanCollide = false,
 	})
 end
 
 for _, route in routes do
 	pathStrip(route[1], route[2], 10)
+end
+
+-- Thin, irregular wet patches catch the moon and lantern without changing
+-- collision or pathfinding. Their low opacity keeps them grounded in the mud.
+for index = 1, 34 do
+	local route = routes[((index - 1) % #routes) + 1]
+	local alpha = rng:NextNumber(0.08, 0.92)
+	local center = route[1]:Lerp(route[2], alpha)
+	local direction = route[2] - route[1]
+	local yaw = math.atan2(-direction.X, -direction.Z)
+	part({
+		Name = "RainPuddle",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.035, rng:NextNumber(1.3, 3.8), rng:NextNumber(2.2, 6.0)),
+		CFrame = CFrame.new(center + Vector3.new(rng:NextNumber(-3.4, 3.4), 0.17, rng:NextNumber(-3.4, 3.4)))
+			* CFrame.Angles(0, yaw + rng:NextNumber(-0.35, 0.35), math.rad(90)),
+		Color = Color3.fromRGB(61, 73, 78),
+		Material = Enum.Material.Glass,
+		Transparency = rng:NextNumber(0.34, 0.53),
+		Reflectance = 0.28,
+		CanCollide = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
 end
 
 for _, wall in {

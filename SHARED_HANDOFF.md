@@ -229,3 +229,30 @@ death and respawn with no custom death screen or jumpscare.
   one skin, and one embedded 48-frame unsettling idle animation.
 - V2 remains an approval asset and is not integrated into the live Roblox model
   yet. Wait for the user's visual approval before replacing the native prototype.
+
+## Cinematic storm and survivor directive (2026-09-10)
+
+- Upgraded the project and runtime map to Future lighting and bumped the generated
+  map to `TheHollow_3` so Studio rebuilds it on the next playtest.
+- Reworked normal gameplay into a cold, near-monochrome storm: denser layered
+  atmosphere, shorter distance fog, softer high-quality shadows, stronger wet
+  specular response, restrained bloom, and subtle cinematic depth of field.
+- Added pooled client rain and rare cold lightning flashes in
+  `Weather.client.luau`. The storm uses no uploaded assets and continuously
+  follows the camera without allocating new parts during play.
+- Added 34 collisionless glass rain puddles along the procedural routes. They
+  catch moon and lantern highlights while leaving AI navigation unchanged.
+- Replaced the single objective line with a top-center survivor directive card:
+  Garamond `OBJECTIVE` title, analog-horror eyebrow, luminous divider/diamond,
+  wrapped objective copy, and a short slide/fade reveal whenever it updates.
+  The existing gate-power strip moved below it and the entire directive remains
+  hidden from the player-controlled Blind One.
+- Revised Studio Photo Mode to remove only darkness and fog: it uses clear
+  daylight, bright ambient/exposure, zero legacy fog, and zero Atmosphere
+  density/haze. It no longer disables post effects or changes Future lighting,
+  shadows, diffuse/specular quality, rain, or wet surfaces. Dread darkness and
+  storm lens edges are hidden while Photo Mode is active; the rest of the
+  cinematic graphics remain on.
+- Rojo build and `git diff --check` passed, producing
+  `build/the-blind-one-atmosphere-test.rbxlx`. The active PC Rojo server remains
+  the correct repo server on port 34872.
