@@ -1,11 +1,11 @@
 --!strict
--- Runtime greybox for The Hollow: a cursed forest settlement built around
--- readable landmarks and looping paths instead of a room maze.
+-- The Hollow: a rain-soaked abandoned settlement with readable streets,
+-- layered silhouettes, and looping routes for survivors and the monster.
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local MAP_VERSION = "TheHollow_3"
+local MAP_VERSION = "HollowSettlement_1"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
 if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then
 	return
@@ -28,89 +28,68 @@ local function part(props: { [string]: any }, parent: Instance?): Part
 	object.Anchored = true
 	object.TopSurface = Enum.SurfaceType.Smooth
 	object.BottomSurface = Enum.SurfaceType.Smooth
-	for key, value in props do
-		(object :: any)[key] = value
-	end
+	for key, value in props do (object :: any)[key] = value end
 	object.Parent = parent or map
 	return object
 end
 
-local function cylinderBetween(name: string, a: Vector3, b: Vector3, thickness: number, color: Color3, parent: Instance): Part
+local function model(name: string): Model
+	local object = Instance.new("Model")
+	object.Name = name
+	object.Parent = map
+	return object
+end
+
+local function cylinderBetween(name: string, a: Vector3, b: Vector3, thickness: number, color: Color3, material: Enum.Material, parent: Instance): Part
 	local delta = b - a
-	return part({
-		Name = name,
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(delta.Magnitude, thickness, thickness),
-		CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(-90), 0),
-		Color = color,
-		Material = Enum.Material.Wood,
-	}, parent)
+	return part({ Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(delta.Magnitude, thickness, thickness), CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(-90), 0), Color = color, Material = material }, parent)
 end
 
-local function pointLight(parent: Instance, color: Color3, brightness: number, range: number)
+local function pointLight(parent: Instance, color: Color3, brightness: number, range: number, shadows: boolean?)
 	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Brightness = brightness
-	light.Range = range
-	light.Shadows = true
+	light.Color, light.Brightness, light.Range, light.Shadows = color, brightness, range, shadows == true
 	light.Parent = parent
+	return light
 end
 
-local function addSign(parent: Instance, text: string, position: Vector3, yaw: number)
-	part({
-		Name = text .. " Signpost",
-		Size = Vector3.new(0.45, 5, 0.45),
-		Position = position + Vector3.new(0, 2.5, 0),
-		Color = Color3.fromRGB(38, 25, 17),
-		Material = Enum.Material.Wood,
-	}, parent)
-	local board = part({
-		Name = "Sign",
-		Size = Vector3.new(7, 2.1, 0.38),
-		CFrame = CFrame.new(position + Vector3.new(0, 4.5, 0)) * CFrame.Angles(0, math.rad(yaw), 0),
-		Color = Color3.fromRGB(48, 31, 21),
-		Material = Enum.Material.WoodPlanks,
-	}, parent)
+local function surfaceText(parent: BasePart, text: string, color: Color3, face: Enum.NormalId?)
 	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
+	gui.Face = face or Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 40
-	gui.Parent = board
+	gui.PixelsPerStud = 46
+	gui.LightInfluence = 0.35
+	gui.Parent = parent
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Text = text
 	label.Font = Enum.Font.SpecialElite
 	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(184, 169, 140)
-	label.TextStrokeTransparency = 0.45
+	label.TextColor3 = color
+	label.TextStrokeColor3 = Color3.fromRGB(3, 4, 5)
+	label.TextStrokeTransparency = 0.18
 	label.Parent = gui
 end
 
---------------------------------------------------------------------- atmosphere
-pcall(function()
-	(Lighting :: any).Technology = Enum.Technology.Future
-end)
-Lighting.ClockTime = 2.15
-Lighting.Brightness = 1.15
-Lighting.Ambient = Color3.fromRGB(24, 28, 31)
-Lighting.OutdoorAmbient = Color3.fromRGB(15, 20, 23)
-Lighting.EnvironmentDiffuseScale = 0.22
-Lighting.EnvironmentSpecularScale = 0.72
+--------------------------------------------------------------------- cinematic overcast
+pcall(function() (Lighting :: any).Technology = Enum.Technology.Future end)
+Lighting.ClockTime = 4.65
+Lighting.Brightness = 2.05
+Lighting.Ambient = Color3.fromRGB(48, 54, 58)
+Lighting.OutdoorAmbient = Color3.fromRGB(60, 68, 72)
+Lighting.EnvironmentDiffuseScale = 0.38
+Lighting.EnvironmentSpecularScale = 0.82
 Lighting.GlobalShadows = true
-Lighting.ShadowSoftness = 0.48
-Lighting.ExposureCompensation = -0.28
-Lighting.FogColor = Color3.fromRGB(32, 39, 43)
-Lighting.FogStart = 22
-Lighting.FogEnd = 142
+Lighting.ShadowSoftness = 0.62
+Lighting.ExposureCompensation = 0.12
+Lighting.FogColor = Color3.fromRGB(61, 68, 72)
+Lighting.FogStart = 38
+Lighting.FogEnd = 215
 
 for _, effect in Lighting:GetChildren() do
-	if effect.Name == "TheHollowGrade"
-		or effect.Name == "TheHollowAtmosphere"
-		or effect.Name == "TheHollowBloom"
-		or effect.Name == "TheHollowDepth" then
+	if effect.Name == "TheHollowGrade" or effect.Name == "TheHollowAtmosphere" or effect.Name == "TheHollowBloom" or effect.Name == "TheHollowDepth" then
 		effect:Destroy()
-	elseif effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") then
+	elseif effect:IsA("SunRaysEffect") then
 		effect.Enabled = false
 	elseif effect:IsA("Atmosphere") then
 		effect.Density = 0
@@ -118,295 +97,246 @@ for _, effect in Lighting:GetChildren() do
 end
 
 local grade = Instance.new("ColorCorrectionEffect")
-grade.Name = "TheHollowGrade"
-grade.Brightness = -0.025
-grade.Contrast = 0.24
-grade.Saturation = -0.48
-grade.TintColor = Color3.fromRGB(190, 207, 211)
+grade.Name, grade.Brightness, grade.Contrast, grade.Saturation = "TheHollowGrade", 0.025, 0.16, -0.58
+grade.TintColor = Color3.fromRGB(204, 214, 216)
 grade.Parent = Lighting
 
 local atmosphere = Instance.new("Atmosphere")
 atmosphere.Name = "TheHollowAtmosphere"
-atmosphere.Color = Color3.fromRGB(86, 99, 103)
-atmosphere.Decay = Color3.fromRGB(17, 24, 28)
-atmosphere.Density = 0.36
-atmosphere.Haze = 2.15
-atmosphere.Glare = 0
-atmosphere.Offset = -0.22
+atmosphere.Color, atmosphere.Decay = Color3.fromRGB(112, 122, 125), Color3.fromRGB(34, 42, 47)
+atmosphere.Density, atmosphere.Haze, atmosphere.Glare, atmosphere.Offset = 0.27, 1.85, 0, -0.18
 atmosphere.Parent = Lighting
 
 local bloom = Instance.new("BloomEffect")
-bloom.Name = "TheHollowBloom"
-bloom.Intensity = 0.24
-bloom.Size = 38
-bloom.Threshold = 1.12
+bloom.Name, bloom.Intensity, bloom.Size, bloom.Threshold = "TheHollowBloom", 0.19, 34, 0.94
 bloom.Parent = Lighting
 
 local depth = Instance.new("DepthOfFieldEffect")
-depth.Name = "TheHollowDepth"
-depth.FarIntensity = 0.13
-depth.FocusDistance = 52
-depth.InFocusRadius = 38
-depth.NearIntensity = 0.025
+depth.Name, depth.FarIntensity, depth.FocusDistance, depth.InFocusRadius, depth.NearIntensity = "TheHollowDepth", 0.065, 70, 55, 0.015
 depth.Parent = Lighting
 
---------------------------------------------------------------------- ground and routes
-part({
-	Name = "ForestFloor",
-	Size = Vector3.new(360, 2, 360),
-	Position = Vector3.new(0, -1, 0),
-	Color = Color3.fromRGB(24, 28, 22),
-	Material = Enum.Material.Ground,
-})
-
-local routes: { { Vector3 } } = {
-	{ Vector3.new(66, 0, -68), Vector3.new(5, 0, 20) },
-	{ Vector3.new(5, 0, 20), Vector3.new(98, 0, 72) },
-	{ Vector3.new(5, 0, 20), Vector3.new(-104, 0, 65) },
-	{ Vector3.new(-104, 0, 65), Vector3.new(-78, 0, -86) },
-	{ Vector3.new(-78, 0, -86), Vector3.new(0, 0, -166) },
-	{ Vector3.new(66, 0, -68), Vector3.new(0, 0, -166) },
-	{ Vector3.new(98, 0, 72), Vector3.new(66, 0, -68) },
-	{ Vector3.new(-78, 0, -86), Vector3.new(5, 0, 20) },
-}
-
-local function pathStrip(a: Vector3, b: Vector3, width: number)
-	local midpoint = (a + b) / 2
-	part({
-		Name = "MuddyPath",
-		Size = Vector3.new(width, 0.18, (b - a).Magnitude),
-		CFrame = CFrame.lookAt(midpoint + Vector3.new(0, 0.05, 0), b),
-		Color = Color3.fromRGB(39, 32, 24),
-		Material = Enum.Material.Mud,
-		Reflectance = 0.08,
-		CanCollide = false,
-	})
+local terrain = Workspace:FindFirstChildOfClass("Terrain")
+if terrain then
+	local oldClouds = terrain:FindFirstChild("TheHollowClouds")
+	if oldClouds then oldClouds:Destroy() end
+	local clouds = Instance.new("Clouds")
+	clouds.Name, clouds.Cover, clouds.Density = "TheHollowClouds", 0.92, 0.72
+	clouds.Color = Color3.fromRGB(69, 74, 77)
+	clouds.Parent = terrain
 end
 
-for _, route in routes do
-	pathStrip(route[1], route[2], 10)
-end
+--------------------------------------------------------------------- wet streets
+part({ Name = "TownGround", Size = Vector3.new(440, 2, 440), Position = Vector3.new(0, -1, 0), Color = Color3.fromRGB(23, 27, 25), Material = Enum.Material.Ground })
+local roadColor = Color3.fromRGB(28, 32, 34)
+part({ Name = "MainStreet", Size = Vector3.new(34, 0.35, 420), Position = Vector3.new(0, 0.08, 0), Color = roadColor, Material = Enum.Material.Asphalt, Reflectance = 0.08 })
+part({ Name = "CrossStreet", Size = Vector3.new(420, 0.35, 34), Position = Vector3.new(0, 0.09, 25), Color = roadColor, Material = Enum.Material.Asphalt, Reflectance = 0.08 })
+part({ Name = "SouthStreet", Size = Vector3.new(255, 0.35, 28), Position = Vector3.new(0, 0.1, -112), Color = roadColor, Material = Enum.Material.Asphalt, Reflectance = 0.08 })
 
--- Thin, irregular wet patches catch the moon and lantern without changing
--- collision or pathfinding. Their low opacity keeps them grounded in the mud.
-for index = 1, 34 do
-	local route = routes[((index - 1) % #routes) + 1]
-	local alpha = rng:NextNumber(0.08, 0.92)
-	local center = route[1]:Lerp(route[2], alpha)
-	local direction = route[2] - route[1]
-	local yaw = math.atan2(-direction.X, -direction.Z)
-	part({
-		Name = "RainPuddle",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.035, rng:NextNumber(1.3, 3.8), rng:NextNumber(2.2, 6.0)),
-		CFrame = CFrame.new(center + Vector3.new(rng:NextNumber(-3.4, 3.4), 0.17, rng:NextNumber(-3.4, 3.4)))
-			* CFrame.Angles(0, yaw + rng:NextNumber(-0.35, 0.35), math.rad(90)),
-		Color = Color3.fromRGB(61, 73, 78),
-		Material = Enum.Material.Glass,
-		Transparency = rng:NextNumber(0.34, 0.53),
-		Reflectance = 0.28,
-		CanCollide = false,
-		CanTouch = false,
-		CastShadow = false,
-	})
+local concrete = Color3.fromRGB(74, 77, 75)
+for _, x in { -22, 22 } do
+	part({ Name = "MainSidewalk", Size = Vector3.new(9, 0.55, 420), Position = Vector3.new(x, 0.27, 0), Color = concrete, Material = Enum.Material.Concrete })
+	part({ Name = "MainCurb", Size = Vector3.new(0.65, 0.75, 420), Position = Vector3.new(if x < 0 then -17.3 else 17.3, 0.38, 0), Color = Color3.fromRGB(91, 93, 89), Material = Enum.Material.Concrete })
 end
-
-for _, wall in {
-	{ Vector3.new(-180, 18, 0), Vector3.new(2, 36, 360) },
-	{ Vector3.new(180, 18, 0), Vector3.new(2, 36, 360) },
-	{ Vector3.new(0, 18, -180), Vector3.new(360, 36, 2) },
-	{ Vector3.new(0, 18, 180), Vector3.new(360, 36, 2) },
+for _, z in { 3, 47 } do
+	part({ Name = "CrossSidewalk", Size = Vector3.new(420, 0.55, 9), Position = Vector3.new(0, 0.28, z), Color = concrete, Material = Enum.Material.Concrete })
+	part({ Name = "CrossCurb", Size = Vector3.new(420, 0.75, 0.65), Position = Vector3.new(0, 0.39, if z < 25 then 7.7 else 42.3), Color = Color3.fromRGB(91, 93, 89), Material = Enum.Material.Concrete })
+end
+for z = -175, 175, 18 do
+	part({ Name = "FadedCenterLine", Size = Vector3.new(0.28, 0.025, 8), Position = Vector3.new(0, 0.3, z), Color = Color3.fromRGB(143, 139, 120), Material = Enum.Material.SmoothPlastic, Transparency = 0.32, CanCollide = false, CastShadow = false })
+end
+for x = -180, 180, 22 do
+	part({ Name = "FadedCrossLine", Size = Vector3.new(10, 0.025, 0.25), Position = Vector3.new(x, 0.31, 25), Color = Color3.fromRGB(143, 139, 120), Material = Enum.Material.SmoothPlastic, Transparency = 0.4, CanCollide = false, CastShadow = false })
+end
+for stripe = -4, 4 do
+	part({ Name = "Crosswalk", Size = Vector3.new(2.2, 0.03, 10), Position = Vector3.new(stripe * 3.6, 0.32, -1), Color = Color3.fromRGB(166, 169, 166), Material = Enum.Material.SmoothPlastic, Transparency = 0.25, CanCollide = false, CastShadow = false })
+end
+for _, data in {
+	{ Vector3.new(-7, 0.34, 134), Vector3.new(7, 0.035, 15), 0.42 }, { Vector3.new(8, 0.34, 82), Vector3.new(6, 0.035, 20), 0.36 },
+	{ Vector3.new(-5, 0.34, 10), Vector3.new(9, 0.035, 12), 0.45 }, { Vector3.new(6, 0.34, -66), Vector3.new(8, 0.035, 19), 0.4 },
+	{ Vector3.new(-7, 0.34, -139), Vector3.new(6, 0.035, 13), 0.38 }, { Vector3.new(79, 0.35, 24), Vector3.new(17, 0.035, 7), 0.45 },
+	{ Vector3.new(-86, 0.35, 28), Vector3.new(21, 0.035, 6), 0.43 },
 } do
-	part({ Name = "ForestBoundary", Position = wall[1], Size = wall[2], Transparency = 1, CanQuery = false, CastShadow = false })
+	part({ Name = "RoadSheen", Size = data[2], Position = data[1], Color = Color3.fromRGB(90, 105, 110), Material = Enum.Material.Glass, Transparency = data[3], Reflectance = 0.32, CanCollide = false, CanTouch = false, CastShadow = false })
+end
+for _, wall in {
+	{ Vector3.new(-220, 18, 0), Vector3.new(2, 36, 440) }, { Vector3.new(220, 18, 0), Vector3.new(2, 36, 440) },
+	{ Vector3.new(0, 18, -220), Vector3.new(440, 36, 2) }, { Vector3.new(0, 18, 220), Vector3.new(440, 36, 2) },
+} do
+	part({ Name = "TownBoundary", Position = wall[1], Size = wall[2], Transparency = 1, CanQuery = false, CastShadow = false })
 end
 
---------------------------------------------------------------------- forest dressing
-local clearZones = {
-	{ Vector3.new(5, 0, 20), 35 },
-	{ Vector3.new(98, 0, 72), 29 },
-	{ Vector3.new(-104, 0, 65), 31 },
-	{ Vector3.new(-78, 0, -86), 31 },
-	{ Vector3.new(66, 0, -68), 25 },
-	{ Vector3.new(0, 0, -166), 24 },
-}
-
-local function distanceToRoute(position: Vector3, a: Vector3, b: Vector3): number
-	local p = Vector2.new(position.X, position.Z)
-	local start = Vector2.new(a.X, a.Z)
-	local finish = Vector2.new(b.X, b.Z)
-	local segment = finish - start
-	local alpha = math.clamp((p - start):Dot(segment) / math.max(segment:Dot(segment), 0.001), 0, 1)
-	return (p - (start + segment * alpha)).Magnitude
-end
-
-local function treeAllowed(position: Vector3): boolean
-	for _, zone in clearZones do
-		if (Vector2.new(position.X, position.Z) - Vector2.new(zone[1].X, zone[1].Z)).Magnitude < zone[2] then
-			return false
+--------------------------------------------------------------------- architecture
+type Facing = "North" | "South" | "East" | "West"
+local function makeBuilding(name: string, center: Vector3, footprint: Vector2, floors: number, facing: Facing, wallColor: Color3, signText: string?): Model
+	local building = model(name)
+	local height = floors * 9 + 3
+	part({ Name = "Foundation", Size = Vector3.new(footprint.X + 2, 1.2, footprint.Y + 2), Position = center + Vector3.new(0, 0.6, 0), Color = Color3.fromRGB(45, 47, 45), Material = Enum.Material.Concrete }, building)
+	part({ Name = "BuildingShell", Size = Vector3.new(footprint.X, height, footprint.Y), Position = center + Vector3.new(0, height / 2 + 1.2, 0), Color = wallColor, Material = Enum.Material.Brick }, building)
+	part({ Name = "Roof", Size = Vector3.new(footprint.X + 3, 1, footprint.Y + 3), Position = center + Vector3.new(0, height + 1.7, 0), Color = Color3.fromRGB(30, 32, 32), Material = Enum.Material.Slate }, building)
+	for _, zSide in { -1, 1 } do
+		part({ Name = "RoofParapet", Size = Vector3.new(footprint.X + 3, 2.2, 0.8), Position = center + Vector3.new(0, height + 2.6, zSide * (footprint.Y / 2 + 1.1)), Color = wallColor, Material = Enum.Material.Brick }, building)
+	end
+	local axisX = facing == "North" or facing == "South"
+	local outward = if facing == "North" then Vector3.new(0, 0, -1) elseif facing == "South" then Vector3.new(0, 0, 1) elseif facing == "East" then Vector3.new(1, 0, 0) else Vector3.new(-1, 0, 0)
+	local frontage = if axisX then footprint.X else footprint.Y
+	local columns = math.max(2, math.floor(frontage / 9))
+	for floor = 1, floors do
+		for column = 1, columns do
+			local across = -frontage / 2 + column * (frontage / (columns + 1))
+			local y = 5.5 + (floor - 1) * 9
+			local position = center + outward * ((if axisX then footprint.Y else footprint.X) / 2 + 0.08)
+			position += if axisX then Vector3.new(across, y, 0) else Vector3.new(0, y, across)
+			local lit = ((floor * 5 + column * 3 + math.floor(math.abs(center.X))) % 7 == 0)
+			local window = part({ Name = "Window", Size = if axisX then Vector3.new(4.4, 5, 0.18) else Vector3.new(0.18, 5, 4.4), Position = position, Color = if lit then Color3.fromRGB(181, 164, 118) else Color3.fromRGB(38, 48, 51), Material = if lit then Enum.Material.Neon else Enum.Material.Glass, Transparency = if lit then 0.27 else 0.2, Reflectance = 0.18, CanCollide = false }, building)
+			part({ Name = "WindowLintel", Size = if axisX then Vector3.new(5.1, 0.35, 0.42) else Vector3.new(0.42, 0.35, 5.1), Position = position + Vector3.new(0, 2.7, 0) + outward * 0.05, Color = Color3.fromRGB(92, 93, 88), Material = Enum.Material.Concrete, CanCollide = false }, building)
+			if lit and floor == 1 then pointLight(window, Color3.fromRGB(214, 190, 140), 0.22, 11, false) end
 		end
 	end
-	for _, route in routes do
-		if distanceToRoute(position, route[1], route[2]) < 8.5 then
-			return false
+	local facadeDistance = (if axisX then footprint.Y else footprint.X) / 2
+	local doorPosition = center + outward * (facadeDistance + 0.14) + Vector3.new(0, 4.2, 0)
+	part({ Name = "LockedDoor", Size = if axisX then Vector3.new(5, 7.4, 0.32) else Vector3.new(0.32, 7.4, 5), Position = doorPosition, Color = Color3.fromRGB(33, 36, 36), Material = Enum.Material.Metal }, building)
+	local awningPosition = center + outward * (facadeDistance + 2.4) + Vector3.new(0, 7.7, 0)
+	part({ Name = "RainAwning", Size = if axisX then Vector3.new(math.min(18, frontage - 3), 0.35, 4.8) else Vector3.new(4.8, 0.35, math.min(18, frontage - 3)), Position = awningPosition, Color = Color3.fromRGB(42, 51, 53), Material = Enum.Material.Metal }, building)
+	if signText then
+		local signPosition = center + outward * (facadeDistance + 0.26) + Vector3.new(0, 10.2, 0)
+		local sign = part({ Name = "StoreSign", Size = if axisX then Vector3.new(math.min(20, frontage - 4), 3.2, 0.35) else Vector3.new(0.35, 3.2, math.min(20, frontage - 4)), Position = signPosition, Color = Color3.fromRGB(28, 34, 35), Material = Enum.Material.Metal }, building)
+		local signFace = if facing == "North" then Enum.NormalId.Front
+			elseif facing == "South" then Enum.NormalId.Back
+			elseif facing == "East" then Enum.NormalId.Right
+			else Enum.NormalId.Left
+		surfaceText(sign, signText, Color3.fromRGB(192, 199, 194), signFace)
+	end
+	local pipeX = center.X + (if axisX then footprint.X / 2 - 2 else outward.X * (footprint.X / 2 + 0.35))
+	local pipeZ = center.Z + (if axisX then outward.Z * (footprint.Y / 2 + 0.35) else footprint.Y / 2 - 2)
+	part({ Name = "DrainPipe", Size = Vector3.new(0.45, height, 0.45), Position = Vector3.new(pipeX, height / 2 + 1.2, pipeZ), Color = Color3.fromRGB(50, 54, 54), Material = Enum.Material.CorrodedMetal }, building)
+	part({ Name = "RoofVent", Size = Vector3.new(3.4, 2.4, 3.4), Position = center + Vector3.new(footprint.X * 0.23, height + 2.6, -footprint.Y * 0.16), Color = Color3.fromRGB(46, 49, 49), Material = Enum.Material.CorrodedMetal }, building)
+	return building
+end
+
+local clinic = makeBuilding("MorrowClinic", Vector3.new(60, 0, -72), Vector2.new(50, 45), 3, "West", Color3.fromRGB(69, 75, 73), "MORROW CLINIC")
+local market = makeBuilding("HollowMarket", Vector3.new(-61, 0, 71), Vector2.new(52, 42), 2, "East", Color3.fromRGB(77, 72, 65), "HOLLOW MARKET")
+local laundry = makeBuilding("Laundry", Vector3.new(58, 0, 116), Vector2.new(47, 39), 2, "West", Color3.fromRGB(64, 71, 72), "24 HOUR LAUNDRY")
+makeBuilding("AshdownApartments", Vector3.new(-67, 0, -65), Vector2.new(58, 50), 4, "East", Color3.fromRGB(63, 61, 58), "ASHDOWN")
+makeBuilding("TownHall", Vector3.new(72, 0, 67), Vector2.new(62, 42), 3, "South", Color3.fromRGB(72, 74, 70), "MUNICIPAL HALL")
+makeBuilding("ClosedPharmacy", Vector3.new(-116, 0, 67), Vector2.new(42, 40), 2, "South", Color3.fromRGB(63, 72, 68), "PHARMACY")
+makeBuilding("BoardedHotel", Vector3.new(106, 0, -150), Vector2.new(62, 48), 4, "North", Color3.fromRGB(66, 62, 59), "THE HOLLOW HOTEL")
+makeBuilding("OldSchool", Vector3.new(-106, 0, -151), Vector2.new(68, 46), 3, "North", Color3.fromRGB(71, 65, 60), "HOLLOW SCHOOL")
+
+-- Exterior layers that make the façades read as occupied structures rather
+-- than solid boxes: fire escape, loading clutter, grates, and street fixtures.
+local fireEscape = model("AshdownFireEscape")
+for level = 1, 3 do
+	local y = 7 + (level - 1) * 8.5
+	part({ Name = "Platform", Size = Vector3.new(4.8, 0.3, 10), Position = Vector3.new(-36.7, y, -65), Color = Color3.fromRGB(38, 41, 41), Material = Enum.Material.DiamondPlate }, fireEscape)
+	for zOffset = -4.6, 4.6, 9.2 do
+		part({ Name = "RailPost", Size = Vector3.new(0.22, 2.5, 0.22), Position = Vector3.new(-34.4, y + 1.25, -65 + zOffset), Color = Color3.fromRGB(40, 43, 43), Material = Enum.Material.Metal }, fireEscape)
+	end
+	part({ Name = "OuterRail", Size = Vector3.new(0.22, 0.22, 10), Position = Vector3.new(-34.4, y + 2.45, -65), Color = Color3.fromRGB(40, 43, 43), Material = Enum.Material.Metal }, fireEscape)
+	if level < 3 then
+		for rung = 0, 7 do
+			part({ Name = "LadderRung", Size = Vector3.new(0.18, 0.18, 2.2), CFrame = CFrame.new(-34.3, y + 0.7 + rung, -61.5) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(44, 46, 46), Material = Enum.Material.Metal }, fireEscape)
 		end
 	end
-	return true
 end
 
-local function deadTree(position: Vector3, height: number, yaw: number, withNeedles: boolean)
-	local model = Instance.new("Model")
-	model.Name = "DeadPine"
-	model.Parent = map
-	local bark = Color3.fromRGB(rng:NextInteger(24, 34), rng:NextInteger(19, 27), rng:NextInteger(15, 21))
-	local base = position + Vector3.new(0, 0.35, 0)
-	local top = position + Vector3.new(0, height, 0)
-	cylinderBetween("Trunk", base, top, math.max(1.1, height * 0.075), bark, model)
-	for branchIndex = 1, 3 do
-		local branchY = height * (0.46 + branchIndex * 0.13)
-		local angle = yaw + branchIndex * 2.0
-		local start = position + Vector3.new(0, branchY, 0)
-		local length = height * (0.20 - branchIndex * 0.02)
-		local finish = start + Vector3.new(math.cos(angle) * length, length * 0.44, math.sin(angle) * length)
-		cylinderBetween("CrookedBranch", start, finish, math.max(0.35, height * 0.028), bark, model)
-		local fork = finish + Vector3.new(math.cos(angle + 0.8) * length * 0.38, length * 0.32, math.sin(angle + 0.8) * length * 0.38)
-		cylinderBetween("Fork", finish, fork, math.max(0.23, height * 0.019), bark, model)
-	end
-	if withNeedles then
-		for index = 1, 2 do
-			part({
-				Name = "BlackNeedles", Shape = Enum.PartType.Ball, Size = Vector3.new(7 - index, 5, 7 - index),
-				Position = position + Vector3.new(0, height * (0.67 + index * 0.10), 0), Color = Color3.fromRGB(8, 18, 14),
-				Material = Enum.Material.LeafyGrass, CanCollide = false,
-			}, model)
-		end
-	end
+for _, position in { Vector3.new(-10, 0.36, 61), Vector3.new(10, 0.36, -84), Vector3.new(-72, 0.36, 25), Vector3.new(113, 0.36, 25) } do
+	part({ Name = "StormDrain", Size = Vector3.new(3.2, 0.05, 1.3), Position = position, Color = Color3.fromRGB(25, 28, 28), Material = Enum.Material.DiamondPlate, CanCollide = false })
 end
 
-local madeTrees = 0
-for _ = 1, 500 do
-	if madeTrees >= 72 then break end
-	local position = Vector3.new(rng:NextNumber(-172, 172), 0, rng:NextNumber(-172, 172))
-	if treeAllowed(position) then
-		madeTrees += 1
-		deadTree(position, rng:NextNumber(17, 29), rng:NextNumber(0, math.pi * 2), madeTrees % 4 == 0)
-	end
+for _, position in { Vector3.new(25, 0.55, 58), Vector3.new(-25, 0.55, -26) } do
+	local hydrant = model("FireHydrant")
+	part({ Name = "Body", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.3, 1.05, 1.05), CFrame = CFrame.new(position + Vector3.new(0, 1.15, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(105, 42, 35), Material = Enum.Material.Metal }, hydrant)
+	part({ Name = "Cap", Shape = Enum.PartType.Ball, Size = Vector3.new(1.25, 0.7, 1.25), Position = position + Vector3.new(0, 2.25, 0), Color = Color3.fromRGB(91, 37, 32), Material = Enum.Material.Metal }, hydrant)
 end
 
-for _ = 1, 34 do
-	local position = Vector3.new(rng:NextNumber(-168, 168), 0.65, rng:NextNumber(-168, 168))
-	if treeAllowed(position) then
-		part({
-			Name = "MossyBoulder", Shape = Enum.PartType.Ball,
-			Size = Vector3.new(rng:NextNumber(2.0, 5.0), rng:NextNumber(1.3, 3.0), rng:NextNumber(2.0, 5.0)),
-			CFrame = CFrame.new(position) * CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, math.pi), rng:NextNumber(-0.4, 0.4)),
-			Color = Color3.fromRGB(38, 43, 37), Material = Enum.Material.Rock,
-		})
+local vending = model("DeadVendingMachine")
+local vendingBody = part({ Name = "Cabinet", Size = Vector3.new(4.2, 7.4, 2.2), Position = Vector3.new(-31.5, 4.25, 64), Color = Color3.fromRGB(33, 48, 55), Material = Enum.Material.Metal }, vending)
+local vendingFace = part({ Name = "Display", Size = Vector3.new(3.45, 5.6, 0.16), Position = vendingBody.Position + Vector3.new(0, 0.35, -1.16), Color = Color3.fromRGB(48, 70, 77), Material = Enum.Material.Glass, Transparency = 0.15 }, vending)
+surfaceText(vendingFace, "COLD DRINKS", Color3.fromRGB(145, 176, 181), Enum.NormalId.Front)
+
+for stack = 1, 12 do
+	local position = Vector3.new(34 + (stack % 3) * 2.7, 1.1 + math.floor((stack - 1) / 3) * 2.15, 92 + (stack % 2) * 2.4)
+	part({ Name = "RainSoakedCrate", Size = Vector3.new(2.5, 2, 2.3), Position = position, Color = Color3.fromRGB(58, 45, 34), Material = Enum.Material.WoodPlanks }, laundry)
+end
+
+--------------------------------------------------------------------- street furniture
+local function streetLamp(position: Vector3, side: number)
+	local lamp = model("StreetLamp")
+	part({ Name = "Post", Size = Vector3.new(0.55, 12.5, 0.55), Position = position + Vector3.new(0, 6.25, 0), Color = Color3.fromRGB(35, 39, 39), Material = Enum.Material.Metal }, lamp)
+	part({ Name = "Arm", Size = Vector3.new(4.2, 0.38, 0.38), Position = position + Vector3.new(-side * 1.85, 12.1, 0), Color = Color3.fromRGB(35, 39, 39), Material = Enum.Material.Metal }, lamp)
+	local bulb = part({ Name = "LampGlass", Size = Vector3.new(1.2, 0.55, 1.2), Position = position + Vector3.new(-side * 3.7, 11.65, 0), Color = Color3.fromRGB(193, 183, 148), Material = Enum.Material.Neon, Transparency = 0.2 }, lamp)
+	pointLight(bulb, Color3.fromRGB(205, 193, 158), 0.75, 26, true)
+end
+for z = -155, 155, 52 do
+	streetLamp(Vector3.new(-27, 0.55, z), -1)
+	streetLamp(Vector3.new(27, 0.55, z + 24), 1)
+end
+
+local polePositions = { -165, -115, -65, -15, 35, 85, 135, 185 }
+local utility = model("UtilityNetwork")
+for _, z in polePositions do
+	local base = Vector3.new(-31.5, 0.55, z)
+	part({ Name = "UtilityPole", Size = Vector3.new(0.75, 18, 0.75), Position = base + Vector3.new(0, 9, 0), Color = Color3.fromRGB(43, 35, 29), Material = Enum.Material.Wood }, utility)
+	part({ Name = "CrossArm", Size = Vector3.new(5.5, 0.42, 0.42), Position = base + Vector3.new(0, 16.2, 0), Color = Color3.fromRGB(43, 35, 29), Material = Enum.Material.Wood }, utility)
+end
+for index = 1, #polePositions - 1 do
+	for xOffset = -1.8, 1.8, 1.8 do
+		local a, b = Vector3.new(-31.5 + xOffset, 16.6, polePositions[index]), Vector3.new(-31.5 + xOffset, 16.6, polePositions[index + 1])
+		local middle = (a + b) / 2 - Vector3.new(0, 1.25, 0)
+		local first = cylinderBetween("PowerLine", a, middle, 0.08, Color3.fromRGB(12, 14, 14), Enum.Material.SmoothPlastic, utility)
+		local second = cylinderBetween("PowerLine", middle, b, 0.08, Color3.fromRGB(12, 14, 14), Enum.Material.SmoothPlastic, utility)
+		first.CanCollide, second.CanCollide = false, false
 	end
 end
 
---------------------------------------------------------------------- chapel
-local chapel = Instance.new("Model")
-chapel.Name = "RuinedChapel"
-chapel.Parent = map
-local chapelCenter = Vector3.new(5, 0, 20)
-part({ Name = "StoneFloor", Size = Vector3.new(32, 1, 44), Position = chapelCenter + Vector3.new(0, 0.5, 0), Color = Color3.fromRGB(43, 43, 40), Material = Enum.Material.Slate }, chapel)
-part({ Name = "BackWall", Size = Vector3.new(32, 15, 2), Position = chapelCenter + Vector3.new(0, 7.5, 21), Color = Color3.fromRGB(38, 39, 38), Material = Enum.Material.Cobblestone }, chapel)
-part({ Name = "LeftWall", Size = Vector3.new(2, 15, 44), Position = chapelCenter + Vector3.new(-15, 7.5, 0), Color = Color3.fromRGB(38, 39, 38), Material = Enum.Material.Cobblestone }, chapel)
-part({ Name = "RightWallBroken", Size = Vector3.new(2, 10, 23), Position = chapelCenter + Vector3.new(15, 5, 9), Color = Color3.fromRGB(38, 39, 38), Material = Enum.Material.Cobblestone }, chapel)
-part({ Name = "FrontLeft", Size = Vector3.new(11, 15, 2), Position = chapelCenter + Vector3.new(-10.5, 7.5, -21), Color = Color3.fromRGB(38, 39, 38), Material = Enum.Material.Cobblestone }, chapel)
-part({ Name = "FrontRight", Size = Vector3.new(11, 15, 2), Position = chapelCenter + Vector3.new(10.5, 7.5, -21), Color = Color3.fromRGB(38, 39, 38), Material = Enum.Material.Cobblestone }, chapel)
-part({ Name = "BrokenRoof", Size = Vector3.new(34, 1, 24), CFrame = CFrame.new(chapelCenter + Vector3.new(-0.5, 15.2, 9)) * CFrame.Angles(0, 0, math.rad(4)), Color = Color3.fromRGB(27, 24, 22), Material = Enum.Material.WoodPlanks }, chapel)
-for row = 1, 3 do
-	local z = chapelCenter.Z - 8 + row * 8
-	for side = -1, 1, 2 do
-		part({ Name = "Pew", Size = Vector3.new(10, 1.1, 2), Position = Vector3.new(chapelCenter.X + side * 7, 1.6, z), Color = Color3.fromRGB(48, 31, 20), Material = Enum.Material.WoodPlanks }, chapel)
+local function abandonedCar(position: Vector3, yaw: number, bodyColor: Color3)
+	local car = model("AbandonedCar")
+	local cf = CFrame.new(position) * CFrame.Angles(0, math.rad(yaw), 0)
+	part({ Name = "Body", Size = Vector3.new(7.5, 1.7, 13.5), CFrame = cf * CFrame.new(0, 1.5, 0), Color = bodyColor, Material = Enum.Material.Metal }, car)
+	part({ Name = "Cabin", Size = Vector3.new(6.8, 2.8, 6.3), CFrame = cf * CFrame.new(0, 3.35, 0.6), Color = Color3.fromRGB(35, 41, 42), Material = Enum.Material.Glass, Transparency = 0.18, Reflectance = 0.2 }, car)
+	for _, offset in { Vector3.new(-4, 0.9, -4.3), Vector3.new(4, 0.9, -4.3), Vector3.new(-4, 0.9, 4.3), Vector3.new(4, 0.9, 4.3) } do
+		part({ Name = "Wheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 2.2, 2.2), CFrame = cf * CFrame.new(offset) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(18, 19, 19), Material = Enum.Material.Rubber }, car)
 	end
 end
-local altar = part({ Name = "AltarEmber", Size = Vector3.new(7, 3, 3), Position = chapelCenter + Vector3.new(0, 2, 16), Color = Color3.fromRGB(29, 21, 18), Material = Enum.Material.Slate }, chapel)
-pointLight(altar, Color3.fromRGB(130, 45, 22), 0.35, 17)
-addSign(chapel, "THE HOLLOW", chapelCenter + Vector3.new(-22, 0, -25), 18)
+abandonedCar(Vector3.new(7, 0.3, 91), 5, Color3.fromRGB(63, 70, 69))
+abandonedCar(Vector3.new(-7, 0.3, -35), -8, Color3.fromRGB(67, 55, 49))
+abandonedCar(Vector3.new(88, 0.3, 30), 88, Color3.fromRGB(51, 61, 65))
 
---------------------------------------------------------------------- ranger cabin
-local cabin = Instance.new("Model")
-cabin.Name = "RangerCabin"
-cabin.Parent = map
-local cabinCenter = Vector3.new(98, 0, 72)
-part({ Name = "Floor", Size = Vector3.new(28, 1, 22), Position = cabinCenter + Vector3.new(0, 0.5, 0), Color = Color3.fromRGB(46, 30, 20), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "BackWall", Size = Vector3.new(28, 11, 1), Position = cabinCenter + Vector3.new(0, 6, 10.5), Color = Color3.fromRGB(42, 27, 18), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "LeftWall", Size = Vector3.new(1, 11, 22), Position = cabinCenter + Vector3.new(-13.5, 6, 0), Color = Color3.fromRGB(42, 27, 18), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "RightWall", Size = Vector3.new(1, 11, 22), Position = cabinCenter + Vector3.new(13.5, 6, 0), Color = Color3.fromRGB(42, 27, 18), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "FrontLeft", Size = Vector3.new(10, 11, 1), Position = cabinCenter + Vector3.new(-9, 6, -10.5), Color = Color3.fromRGB(42, 27, 18), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "FrontRight", Size = Vector3.new(10, 11, 1), Position = cabinCenter + Vector3.new(9, 6, -10.5), Color = Color3.fromRGB(42, 27, 18), Material = Enum.Material.WoodPlanks }, cabin)
-part({ Name = "Roof", Size = Vector3.new(31, 1.2, 25), Position = cabinCenter + Vector3.new(0, 12, 0), Color = Color3.fromRGB(22, 20, 18), Material = Enum.Material.Slate }, cabin)
-local cabinLamp = part({ Name = "DeadLamp", Size = Vector3.new(0.6, 0.6, 0.6), Position = cabinCenter + Vector3.new(0, 9, -8), Color = Color3.fromRGB(168, 92, 36), Material = Enum.Material.Neon }, cabin)
-pointLight(cabinLamp, Color3.fromRGB(190, 110, 53), 0.45, 16)
-addSign(cabin, "RANGER CABIN", cabinCenter + Vector3.new(-17, 0, -16), 10)
+for _, position in { Vector3.new(-27, 0.7, 101), Vector3.new(27, 0.7, -93), Vector3.new(-74, 0.7, 0), Vector3.new(117, 0.7, 48) } do
+	local bin = part({ Name = "Dumpster", Size = Vector3.new(5, 3.6, 3.4), Position = position + Vector3.new(0, 1.8, 0), Color = Color3.fromRGB(36, 48, 45), Material = Enum.Material.CorrodedMetal })
+	part({ Name = "DumpsterLid", Size = Vector3.new(5.3, 0.3, 3.7), Position = bin.Position + Vector3.new(0, 1.95, 0), Color = Color3.fromRGB(30, 38, 37), Material = Enum.Material.Metal })
+end
 
---------------------------------------------------------------------- sawmill
-local sawmill = Instance.new("Model")
-sawmill.Name = "OldSawmill"
-sawmill.Parent = map
-local sawCenter = Vector3.new(-104, 0, 65)
-part({ Name = "MillFloor", Size = Vector3.new(38, 1, 28), Position = sawCenter + Vector3.new(0, 0.5, 0), Color = Color3.fromRGB(41, 29, 20), Material = Enum.Material.WoodPlanks }, sawmill)
-for x = -17, 17, 34 do
-	for z = -12, 12, 24 do
-		part({ Name = "MillPost", Size = Vector3.new(1.2, 13, 1.2), Position = sawCenter + Vector3.new(x, 7, z), Color = Color3.fromRGB(41, 27, 18), Material = Enum.Material.Wood }, sawmill)
+local function townTree(position: Vector3, height: number)
+	local tree = model("RainTree")
+	cylinderBetween("Trunk", position, position + Vector3.new(0, height, 0), 1.2, Color3.fromRGB(38, 31, 26), Enum.Material.Wood, tree)
+	for branch = 1, 5 do
+		local angle = branch * 1.43 + position.X * 0.03
+		local start = position + Vector3.new(0, height * (0.42 + branch * 0.075), 0)
+		local finish = start + Vector3.new(math.cos(angle) * height * 0.25, height * 0.17, math.sin(angle) * height * 0.25)
+		local limb = cylinderBetween("Branch", start, finish, 0.48, Color3.fromRGB(38, 31, 26), Enum.Material.Wood, tree)
+		limb.CanCollide = false
+	end
+	for _ = 1, 4 do
+		part({ Name = "WetLeaves", Shape = Enum.PartType.Ball, Size = Vector3.new(rng:NextNumber(7, 10), rng:NextNumber(5, 8), rng:NextNumber(7, 10)), Position = position + Vector3.new(rng:NextNumber(-3, 3), height - rng:NextNumber(0, 4), rng:NextNumber(-3, 3)), Color = Color3.fromRGB(17, 30, 26), Material = Enum.Material.LeafyGrass, CanCollide = false }, tree)
 	end
 end
-part({ Name = "MillRoof", Size = Vector3.new(42, 1, 31), Position = sawCenter + Vector3.new(0, 14, 0), Color = Color3.fromRGB(25, 23, 20), Material = Enum.Material.Metal }, sawmill)
-part({ Name = "SawTable", Size = Vector3.new(16, 3, 5), Position = sawCenter + Vector3.new(0, 2, 1), Color = Color3.fromRGB(45, 33, 22), Material = Enum.Material.WoodPlanks }, sawmill)
-local blade = part({ Name = "RustSaw", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 6, 6), CFrame = CFrame.new(sawCenter + Vector3.new(0, 5, 1)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(68, 59, 51), Material = Enum.Material.CorrodedMetal }, sawmill)
-blade.CanCollide = false
-for stack = 1, 6 do
-	local z = -8 + (stack % 3) * 3.1
-	cylinderBetween("CutLog", sawCenter + Vector3.new(-14, 1 + math.floor((stack - 1) / 3) * 2, z), sawCenter + Vector3.new(-5, 1 + math.floor((stack - 1) / 3) * 2, z), 1.7, Color3.fromRGB(52, 34, 21), sawmill)
+for _, position in {
+	Vector3.new(-42, 0, 155), Vector3.new(44, 0, 153), Vector3.new(-43, 0, 10), Vector3.new(44, 0, -10),
+	Vector3.new(-44, 0, -125), Vector3.new(43, 0, -138), Vector3.new(-177, 0, 10), Vector3.new(178, 0, 4),
+	Vector3.new(-185, 0, 158), Vector3.new(183, 0, 145), Vector3.new(-180, 0, -170), Vector3.new(177, 0, -177),
+} do townTree(position, rng:NextNumber(20, 28)) end
+for index = 1, 34 do
+	local side = if index % 2 == 0 then -1 else 1
+	townTree(Vector3.new(side * rng:NextNumber(150, 205), 0, rng:NextNumber(-205, 205)), rng:NextNumber(18, 27))
 end
-addSign(sawmill, "OLD SAWMILL", sawCenter + Vector3.new(22, 0, -18), -15)
 
---------------------------------------------------------------------- graveyard
-local graveyard = Instance.new("Model")
-graveyard.Name = "SunkenGraveyard"
-graveyard.Parent = map
-local graveCenter = Vector3.new(-78, 0, -86)
-for row = 0, 3 do
-	for column = 0, 4 do
-		local x = graveCenter.X - 15 + column * 7.5 + rng:NextNumber(-0.8, 0.8)
-		local z = graveCenter.Z - 10 + row * 8 + rng:NextNumber(-0.7, 0.7)
-		part({ Name = "Headstone", Size = Vector3.new(2.6, rng:NextNumber(3.2, 5.0), 0.75), CFrame = CFrame.new(x, 2.1, z) * CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(-0.12, 0.12), rng:NextNumber(-0.10, 0.10)), Color = Color3.fromRGB(53, 57, 52), Material = Enum.Material.Slate }, graveyard)
-	end
-end
-for x = -22, 22, 7.3 do
-	part({ Name = "FencePost", Size = Vector3.new(0.45, 4, 0.45), Position = graveCenter + Vector3.new(x, 2, -16), Color = Color3.fromRGB(38, 36, 31), Material = Enum.Material.Metal }, graveyard)
-	part({ Name = "FencePost", Size = Vector3.new(0.45, 4, 0.45), Position = graveCenter + Vector3.new(x, 2, 18), Color = Color3.fromRGB(38, 36, 31), Material = Enum.Material.Metal }, graveyard)
-end
-local crypt = part({ Name = "Crypt", Size = Vector3.new(11, 7, 8), Position = graveCenter + Vector3.new(-18, 3.5, 10), Color = Color3.fromRGB(43, 46, 43), Material = Enum.Material.Cobblestone }, graveyard)
-pointLight(crypt, Color3.fromRGB(73, 107, 87), 0.18, 12)
-addSign(graveyard, "SUNKEN GRAVES", graveCenter + Vector3.new(22, 0, -19), 12)
-
---------------------------------------------------------------------- survivor camp and spawn
-local camp = Instance.new("Model")
-camp.Name = "AbandonedCamp"
-camp.Parent = map
-local campCenter = Vector3.new(66, 0, -68)
+--------------------------------------------------------------------- gameplay anchors
 local spawnPad = Instance.new("SpawnLocation")
-spawnPad.Name = "Spawn"
-spawnPad.Anchored = true
-spawnPad.Size = Vector3.new(9, 1, 9)
-spawnPad.Position = campCenter + Vector3.new(0, 0.5, 0)
-spawnPad.Transparency = 1
-spawnPad.CastShadow = false
-spawnPad.CanQuery = false
-spawnPad.Duration = 0
+spawnPad.Name, spawnPad.Anchored, spawnPad.Size, spawnPad.Position = "Spawn", true, Vector3.new(9, 1, 9), Vector3.new(0, 0.8, 172)
+spawnPad.Transparency, spawnPad.CastShadow, spawnPad.CanQuery, spawnPad.Duration = 1, false, false, 0
 spawnPad.Parent = map
-for side = -1, 1, 2 do
-	local tent = part({ Name = "CollapsedTent", Size = Vector3.new(8, 0.4, 7), CFrame = CFrame.new(campCenter + Vector3.new(side * 10, 2.2, 4)) * CFrame.Angles(math.rad(25), 0, math.rad(side * 8)), Color = Color3.fromRGB(46, 48, 39), Material = Enum.Material.Fabric }, camp)
-	tent.CanCollide = false
-end
-local fire = part({ Name = "ColdCampfire", Shape = Enum.PartType.Ball, Size = Vector3.new(2.2, 0.7, 2.2), Position = campCenter + Vector3.new(0, 0.55, -6), Color = Color3.fromRGB(116, 45, 20), Material = Enum.Material.Neon }, camp)
-pointLight(fire, Color3.fromRGB(190, 78, 35), 0.65, 17)
-addSign(camp, "ABANDONED CAMP", campCenter + Vector3.new(18, 0, -14), -18)
 
---------------------------------------------------------------------- objective mechanisms
 local function makeMechanism(id: string, displayName: string, position: Vector3, parent: Instance)
 	local station = Instance.new("Model")
 	station.Name = "GateMechanism_" .. id
@@ -414,79 +344,66 @@ local function makeMechanism(id: string, displayName: string, position: Vector3,
 	station:SetAttribute("DisplayName", displayName)
 	station:SetAttribute("Activated", false)
 	station.Parent = parent
-	local base = part({ Name = "Base", Size = Vector3.new(5.6, 3.4, 3.5), Position = position + Vector3.new(0, 1.7, 0), Color = Color3.fromRGB(36, 39, 38), Material = Enum.Material.CorrodedMetal }, station)
+	local base = part({ Name = "Base", Size = Vector3.new(5.8, 4.2, 3.8), Position = position + Vector3.new(0, 2.1, 0), Color = Color3.fromRGB(42, 46, 45), Material = Enum.Material.CorrodedMetal }, station)
 	station.PrimaryPart = base
-	part({ Name = "CoilLeft", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 2.0, 2.0), CFrame = CFrame.new(position + Vector3.new(-2.1, 3.8, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(60, 48, 37), Material = Enum.Material.Metal }, station)
-	part({ Name = "CoilRight", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 2.0, 2.0), CFrame = CFrame.new(position + Vector3.new(2.1, 3.8, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(60, 48, 37), Material = Enum.Material.Metal }, station)
-	local core = part({ Name = "Core", Size = Vector3.new(2.0, 1.2, 0.45), Position = position + Vector3.new(0, 3.8, -1.78), Color = Color3.fromRGB(145, 38, 24), Material = Enum.Material.Neon, CanCollide = false }, station)
-	pointLight(core, Color3.fromRGB(154, 39, 24), 0.35, 8)
-	local lever = cylinderBetween("Lever", position + Vector3.new(0, 3.2, -2.1), position + Vector3.new(1.0, 5.0, -2.1), 0.3, Color3.fromRGB(75, 67, 55), station)
-	lever.Material = Enum.Material.Metal
+	part({ Name = "Panel", Size = Vector3.new(4.6, 2.8, 0.3), Position = position + Vector3.new(0, 2.4, -2.02), Color = Color3.fromRGB(24, 28, 28), Material = Enum.Material.Metal }, station)
+	for offset = -1.45, 1.45, 0.72 do
+		part({ Name = "Fuse", Size = Vector3.new(0.32, 1.1, 0.35), Position = position + Vector3.new(offset, 2.7, -2.24), Color = Color3.fromRGB(84, 76, 62), Material = Enum.Material.Metal, CanCollide = false }, station)
+	end
+	local core = part({ Name = "Core", Size = Vector3.new(1.35, 0.65, 0.22), Position = position + Vector3.new(0, 3.65, -2.22), Color = Color3.fromRGB(131, 45, 35), Material = Enum.Material.Neon, CanCollide = false }, station)
+	pointLight(core, core.Color, 0.38, 9, false)
+	local lever = cylinderBetween("Lever", position + Vector3.new(1.8, 2.5, -2.3), position + Vector3.new(2.5, 4.5, -2.3), 0.28, Color3.fromRGB(86, 80, 67), Enum.Material.Metal, station)
+	lever.CanCollide = false
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "RestorePrompt"
-	prompt.ActionText = "Restore mechanism"
-	prompt.ObjectText = displayName
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
-	prompt.HoldDuration = 3.2
-	prompt.MaxActivationDistance = 10
-	prompt.RequiresLineOfSight = false
+	prompt.Name, prompt.ActionText, prompt.ObjectText = "RestorePrompt", "Restore mechanism", displayName
+	prompt.KeyboardKeyCode, prompt.GamepadKeyCode = Enum.KeyCode.E, Enum.KeyCode.ButtonX
+	prompt.HoldDuration, prompt.MaxActivationDistance, prompt.RequiresLineOfSight = 3.2, 10, false
 	prompt.Parent = base
 	CollectionService:AddTag(station, "GateMechanism")
 end
+makeMechanism("CLINIC", "Clinic backup panel", Vector3.new(29, 0.55, -69), clinic)
+makeMechanism("MARKET", "Market street relay", Vector3.new(-29, 0.55, 73), market)
+makeMechanism("LAUNDRY", "Laundry generator", Vector3.new(29, 0.55, 118), laundry)
 
-makeMechanism("CABIN", "Ranger relay", cabinCenter + Vector3.new(0, 0, 3), cabin)
-makeMechanism("MILL", "Sawmill dynamo", sawCenter + Vector3.new(10, 0, -5), sawmill)
-makeMechanism("GRAVES", "Graveyard ward", graveCenter + Vector3.new(13, 0, 12), graveyard)
-
---------------------------------------------------------------------- escape gate
-local gate = Instance.new("Model")
-gate.Name = "ForestEscapeGate"
-gate.Parent = map
-local gateCenter = Vector3.new(0, 0, -166)
+local gate = model("TownEscapeGate")
+local gateCenter = Vector3.new(0, 0, -198)
 for side = -1, 1, 2 do
-	part({ Name = "GatePillar", Size = Vector3.new(5, 17, 6), Position = gateCenter + Vector3.new(side * 13, 8.5, 0), Color = Color3.fromRGB(44, 46, 43), Material = Enum.Material.Cobblestone }, gate)
+	part({ Name = "GatePillar", Size = Vector3.new(5.5, 18, 6), Position = gateCenter + Vector3.new(side * 14, 9, 0), Color = Color3.fromRGB(55, 59, 57), Material = Enum.Material.Brick }, gate)
 end
-part({ Name = "GateArch", Size = Vector3.new(31, 4, 5.5), Position = gateCenter + Vector3.new(0, 16, 0), Color = Color3.fromRGB(39, 41, 38), Material = Enum.Material.Cobblestone }, gate)
-local leftDoor = part({ Name = "LeftGateDoor", Size = Vector3.new(10.5, 13, 1.4), Position = gateCenter + Vector3.new(-5.25, 6.5, 0), Color = Color3.fromRGB(45, 39, 32), Material = Enum.Material.Metal }, gate)
-local rightDoor = part({ Name = "RightGateDoor", Size = Vector3.new(10.5, 13, 1.4), Position = gateCenter + Vector3.new(5.25, 6.5, 0), Color = Color3.fromRGB(45, 39, 32), Material = Enum.Material.Metal }, gate)
+part({ Name = "GateArch", Size = Vector3.new(33, 4, 5.5), Position = gateCenter + Vector3.new(0, 17, 0), Color = Color3.fromRGB(49, 53, 51), Material = Enum.Material.Brick }, gate)
+local leftDoor = part({ Name = "LeftGateDoor", Size = Vector3.new(11.5, 14, 1.3), Position = gateCenter + Vector3.new(-5.75, 7, 0), Color = Color3.fromRGB(37, 40, 39), Material = Enum.Material.CorrodedMetal }, gate)
+local rightDoor = part({ Name = "RightGateDoor", Size = Vector3.new(11.5, 14, 1.3), Position = gateCenter + Vector3.new(5.75, 7, 0), Color = Color3.fromRGB(37, 40, 39), Material = Enum.Material.CorrodedMetal }, gate)
 CollectionService:AddTag(leftDoor, "EscapeGateDoor")
 CollectionService:AddTag(rightDoor, "EscapeGateDoor")
-local crank = part({ Name = "GateCrank", Size = Vector3.new(3.5, 4.5, 2), Position = gateCenter + Vector3.new(18, 2.25, 5), Color = Color3.fromRGB(48, 44, 38), Material = Enum.Material.CorrodedMetal }, gate)
+for x = -10, 10, 2.4 do
+	part({ Name = "GateBars", Size = Vector3.new(0.3, 12, 1.7), Position = gateCenter + Vector3.new(x, 7, -0.25), Color = Color3.fromRGB(28, 30, 30), Material = Enum.Material.Metal }, gate)
+end
+local crank = part({ Name = "GateCrank", Size = Vector3.new(3.5, 4.5, 2), Position = gateCenter + Vector3.new(20, 2.25, 5), Color = Color3.fromRGB(48, 51, 49), Material = Enum.Material.CorrodedMetal }, gate)
 local crankPrompt = Instance.new("ProximityPrompt")
-crankPrompt.Name = "GatePrompt"
-crankPrompt.ActionText = "Gate locked (0/3)"
-crankPrompt.ObjectText = "Forest escape gate"
-crankPrompt.KeyboardKeyCode = Enum.KeyCode.E
-crankPrompt.GamepadKeyCode = Enum.KeyCode.ButtonX
-crankPrompt.HoldDuration = 0.35
-crankPrompt.MaxActivationDistance = 11
-crankPrompt.RequiresLineOfSight = false
+crankPrompt.Name, crankPrompt.ActionText, crankPrompt.ObjectText = "GatePrompt", "Gate locked (0/3)", "Town perimeter gate"
+crankPrompt.KeyboardKeyCode, crankPrompt.GamepadKeyCode = Enum.KeyCode.E, Enum.KeyCode.ButtonX
+crankPrompt.HoldDuration, crankPrompt.MaxActivationDistance, crankPrompt.RequiresLineOfSight = 0.35, 11, false
 crankPrompt.Parent = crank
 CollectionService:AddTag(crank, "GateCrank")
-local escapeZone = part({ Name = "EscapeZone", Size = Vector3.new(25, 10, 8), Position = gateCenter + Vector3.new(0, 5, -10), Transparency = 1, CanCollide = false, CanQuery = false, CastShadow = false }, gate)
+local escapeZone = part({ Name = "EscapeZone", Size = Vector3.new(26, 10, 8), Position = gateCenter + Vector3.new(0, 5, -10), Transparency = 1, CanCollide = false, CanQuery = false, CastShadow = false }, gate)
 CollectionService:AddTag(escapeZone, "EscapeZone")
-addSign(gate, "FOREST ROAD", gateCenter + Vector3.new(-22, 0, 9), 0)
 
---------------------------------------------------------------------- patrol network and throwable rocks
 local patrolPositions = {
-	Vector3.new(66, 2, -68), Vector3.new(42, 2, -35), Vector3.new(5, 2, 20),
-	Vector3.new(47, 2, 43), Vector3.new(98, 2, 72), Vector3.new(82, 2, 5),
-	Vector3.new(70, 2, -78), Vector3.new(40, 2, -118), Vector3.new(0, 2, -158),
-	Vector3.new(-38, 2, -125), Vector3.new(-78, 2, -86), Vector3.new(-58, 2, -43),
-	Vector3.new(-25, 2, -12), Vector3.new(-58, 2, 4), Vector3.new(-104, 2, 65),
-	Vector3.new(-54, 2, 43), Vector3.new(18, 2, 69), Vector3.new(61, 2, 76),
+	Vector3.new(0, 2, 172), Vector3.new(0, 2, 135), Vector3.new(0, 2, 96), Vector3.new(0, 2, 55), Vector3.new(0, 2, 25),
+	Vector3.new(52, 2, 25), Vector3.new(108, 2, 25), Vector3.new(158, 2, 25), Vector3.new(96, 2, 2), Vector3.new(96, 2, -112),
+	Vector3.new(47, 2, -112), Vector3.new(0, 2, -112), Vector3.new(0, 2, -156), Vector3.new(0, 2, -190), Vector3.new(-48, 2, -112),
+	Vector3.new(-104, 2, -112), Vector3.new(-148, 2, -112), Vector3.new(-98, 2, 25), Vector3.new(-150, 2, 25), Vector3.new(-48, 2, 25),
+	Vector3.new(-29, 2, 72), Vector3.new(29, 2, 118), Vector3.new(29, 2, -69), Vector3.new(0, 2, -38),
 }
 for _, position in patrolPositions do
 	local node = part({ Name = "PatrolNode", Size = Vector3.new(2, 2, 2), Position = position, Transparency = 1, CanCollide = false, CanQuery = false, CastShadow = false })
 	CollectionService:AddTag(node, "PatrolNode")
 end
-
-for index = 1, 11 do
+for index = 1, 14 do
 	local anchor = patrolPositions[((index - 1) % #patrolPositions) + 1]
 	local size = rng:NextNumber(0.82, 1.08)
 	local rock = part({ Name = "Rock", Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), Position = anchor + Vector3.new(rng:NextNumber(-5, 5), 1, rng:NextNumber(-5, 5)), Color = Color3.fromRGB(rng:NextInteger(50, 63), rng:NextInteger(48, 58), rng:NextInteger(43, 52)), Material = Enum.Material.Rock, Anchored = false })
 	CollectionService:AddTag(rock, "Throwable")
 end
 
-print(("MapBuilder: The Hollow ready — %d trees, %d total instances"):format(madeTrees, #map:GetDescendants()))
+print(("MapBuilder: Hollow Settlement ready — %d total instances"):format(#map:GetDescendants()))

@@ -1,6 +1,6 @@
 --!strict
 -- Survivor objective flow for The Hollow:
--- restore three noisy mechanisms, crank open the forest gate, then escape.
+-- restore three noisy mechanisms, crank open the town perimeter, then escape.
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -61,9 +61,9 @@ end
 local function survivorObjective(): string
 	local active, total = mechanismProgress()
 	if generatedMap:GetAttribute("GateOpen") == true then
-		return "THE GATE IS OPEN — get beyond the forest road."
+		return "THE GATE IS OPEN — get beyond the town perimeter."
 	elseif active >= total then
-		return "ALL MECHANISMS RESTORED — crank open the forest gate."
+		return "ALL MECHANISMS RESTORED — crank open the perimeter gate."
 	end
 	return ("Restore the gate mechanisms (%d/%d). Stay quiet."):format(active, total)
 end
@@ -205,7 +205,7 @@ local function connectMechanism(station: Instance)
 		local active, total = mechanismProgress()
 		refreshGatePrompt()
 		if active >= total then
-			broadcastSurvivorObjective("ALL MECHANISMS RESTORED — crank open the forest gate.")
+			broadcastSurvivorObjective("ALL MECHANISMS RESTORED — crank open the perimeter gate.")
 		else
 			broadcastSurvivorObjective(("Mechanism restored (%d/%d). Find the others."):format(active, total))
 		end
@@ -240,7 +240,7 @@ local function openGate(player: Player, crank: Instance)
 		if pulse < 6 then task.wait(0.45) end
 	end
 	refreshGatePrompt()
-	broadcastSurvivorObjective("THE GATE IS OPEN — get beyond the forest road.")
+	broadcastSurvivorObjective("THE GATE IS OPEN — get beyond the town perimeter.")
 	gateOpening = false
 end
 

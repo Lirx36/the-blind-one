@@ -256,3 +256,41 @@ death and respawn with no custom death screen or jumpscare.
 - Rojo build and `git diff --check` passed, producing
   `build/the-blind-one-atmosphere-test.rbxlx`. The active PC Rojo server remains
   the correct repo server on port 34872.
+
+## Hollow Settlement rebuild and flashlight (2026-09-10)
+
+- The first storm playtest was rejected: apart from rain, the old forest
+  greybox still looked unchanged, normal gameplay was nearly pitch black, and
+  the Blind One's grey silhouette outline revealed him at long range.
+- Replaced the entire runtime map in `MapBuilder.server.luau` with
+  `HollowSettlement_1`, a 440-stud abandoned wet town designed around the latest
+  reference screenshots. The rebuild includes three connected asphalt streets,
+  sidewalks and curbs, road markings, a crosswalk, reflective road sheen,
+  storm drains, eight named multi-floor brick buildings, windows and lintels,
+  lit rooms, locked doors, awnings, store signs, roof parapets and vents,
+  drainpipes, a three-level fire escape, utility poles with sagging power lines,
+  streetlights, abandoned cars, dumpsters, hydrants, a dead vending machine,
+  soaked crates, town trees, and dense boundary vegetation.
+- Repositioned and rebuilt all three restoration mechanisms, the survivor spawn,
+  24 AI patrol nodes, throwable rocks, and the final sliding escape gate so the
+  original objective loop remains functional in the new town. Objective copy
+  now refers to the town perimeter instead of the forest road.
+- Retuned normal gameplay lighting after diagnosing two sources of the black
+  screen: negative underexposure and the HUD dread frame covering the entire
+  viewport. Normal play now uses readable predawn overcast light, soft Future
+  shadows, cool grey distance fog, restrained desaturation, wet specular response,
+  subtle bloom/depth, and heavy clouds. Dread now adds at most a faint pulse and
+  can no longer crush the scene to black.
+- Removed the `DarkAura` Highlight from `MonsterAppearance.luau` completely.
+  Survivors no longer receive an outline that reveals The Blind One. Blind One
+  sound-sense silhouettes remain a separate role-only mechanic.
+- Replaced the visible lantern behavior with a compact camera-aimed flashlight
+  in `Lantern.client.luau`. It has a narrow bright shadow-casting hotspot, wide
+  soft spill, near fill, cool neutral color, a dark metal first-person model,
+  camera/hand sway, and follows the exact crosshair direction. `F` still toggles
+  it; the HUD and first-person arm pose now say/use flashlight.
+- Rain was made denser but thinner, shorter, greyer, and more transparent so it
+  reads like rain rather than bright cyan debug lines.
+- Rojo build and `git diff --check` passed, producing
+  `build/the-blind-one-town-test.rbxlx`. GitHub had no incoming laptop commits,
+  and the correct Rojo server remained live on port 34872.

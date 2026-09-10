@@ -12,9 +12,9 @@ local rainFolder = Instance.new("Folder")
 rainFolder.Name = "ClientStorm"
 rainFolder.Parent = workspace
 
-local FALL = Vector3.new(-11, -96, -4)
+local FALL = Vector3.new(-4, -112, -2)
 local RADIUS = 48
-local STREAK_COUNT = 78
+local STREAK_COUNT = 104
 local streaks: { Part } = {}
 
 local function placeStreak(streak: Part, cameraPosition: Vector3, fullHeight: boolean)
@@ -36,9 +36,9 @@ for index = 1, STREAK_COUNT do
 	streak.CanTouch = false
 	streak.CastShadow = false
 	streak.Material = Enum.Material.Neon
-	streak.Color = Color3.fromRGB(176, 195, 201)
-	streak.Transparency = rng:NextNumber(0.55, 0.78)
-	streak.Size = Vector3.new(0.025, 0.025, rng:NextNumber(2.2, 4.8))
+	streak.Color = Color3.fromRGB(151, 165, 170)
+	streak.Transparency = rng:NextNumber(0.72, 0.88)
+	streak.Size = Vector3.new(0.018, 0.018, rng:NextNumber(1.5, 3.3))
 	streak.Parent = rainFolder
 	streaks[index] = streak
 end

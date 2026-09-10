@@ -9,7 +9,7 @@ local character: Model? = nil
 local humanoid: Humanoid? = nil
 local crouchAlpha = 0
 local poseApplied = false
-local lanternPoseApplied = false
+local flashlightPoseApplied = false
 local descendantAddedConnection: RBXScriptConnection? = nil
 local descendantRemovingConnection: RBXScriptConnection? = nil
 
@@ -141,7 +141,7 @@ local function setCharacter(nextCharacter: Model)
 	humanoid = nextHumanoid
 	crouchAlpha = 0
 	poseApplied = false
-	lanternPoseApplied = false
+	flashlightPoseApplied = false
 	visibleParts = {}
 	hiddenFirstPersonParts = {}
 	joints = {}
@@ -175,10 +175,10 @@ local function setCrouchPose(alpha: number)
 	setJointTransform("Waist", CFrame.Angles(math.rad(10 * alpha), 0, 0))
 end
 
-local function setLanternArmPose()
-	-- Keep the right arm extended so the hand meets the lantern handle. Both R15
+local function setFlashlightArmPose()
+	-- Keep the right arm extended so the hand meets the flashlight grip. Both R15
 	-- and classic R6 shoulder names are supported. As the player looks down, lower
-	-- the arm with the camera so it remains above the lantern instead of clipping it.
+	-- the arm with the camera so it remains behind the viewmodel instead of clipping it.
 	local camera = workspace.CurrentCamera
 	local lookDown = if camera then math.clamp(-camera.CFrame.LookVector.Y, 0, 1) else 0
 	local shoulderPitch = 112 - 52 * lookDown
@@ -189,7 +189,7 @@ local function setLanternArmPose()
 	setJointTransform("Right Shoulder", CFrame.Angles(math.rad(shoulderPitch), 0, math.rad(10)))
 end
 
-local function clearLanternArmPose()
+local function clearFlashlightArmPose()
 	setJointTransform("RightShoulder", CFrame.identity)
 	setJointTransform("RightElbow", CFrame.identity)
 	setJointTransform("RightWrist", CFrame.identity)
@@ -247,10 +247,10 @@ RunService.PreSimulation:Connect(function()
 		poseApplied = false
 	end
 	if player:GetAttribute("Role") ~= "BlindOne" then
-		setLanternArmPose()
-		lanternPoseApplied = true
-	elseif lanternPoseApplied then
-		clearLanternArmPose()
-		lanternPoseApplied = false
+		setFlashlightArmPose()
+		flashlightPoseApplied = true
+	elseif flashlightPoseApplied then
+		clearFlashlightArmPose()
+		flashlightPoseApplied = false
 	end
 end)

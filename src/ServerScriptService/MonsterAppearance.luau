@@ -601,15 +601,6 @@ function MonsterAppearance.Apply(character: Model)
 
 	addLimbDetails(visual, character)
 
-	local aura = Instance.new("Highlight")
-	aura.Name = "DarkAura"
-	aura.Adornee = visual
-	aura.DepthMode = Enum.HighlightDepthMode.Occluded
-	aura.FillColor = Color3.fromRGB(0, 0, 0)
-	aura.FillTransparency = 0.93
-	aura.OutlineColor = Color3.fromRGB(62, 64, 68)
-	aura.OutlineTransparency = 0.62
-	aura.Parent = visual
 end
 
 return MonsterAppearance

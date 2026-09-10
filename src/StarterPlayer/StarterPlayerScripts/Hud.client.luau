@@ -19,7 +19,7 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- hide the backpack UI (the lantern is a forced tool) and the mouse cursor
+-- hide the backpack UI (the flashlight is a built-in viewmodel) and mouse cursor
 pcall(function()
 	game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 end)
@@ -183,7 +183,7 @@ local controls = {
 	{ "WASD", "MOVE" },
 	{ "SHIFT", "SPRINT" },
 	{ "CTRL", "CROUCH" },
-	{ "F", "LANTERN" },
+	{ "F", "FLASHLIGHT" },
 	{ "E", "INTERACT / PICK UP" },
 	{ "LMB", "THROW BALL" },
 }
@@ -436,9 +436,10 @@ RunService.RenderStepped:Connect(function()
 	stamFill.Size = UDim2.fromScale(sr, 1)
 	stamFill.BackgroundColor3 = sr < 0.25 and Color3.fromRGB(230, 120, 90) or Color3.fromRGB(90, 150, 230)
 
-	-- dread overlay: base darkness + pulse
-	local pulse = dread > 0.15 and (math.sin(os.clock() * (6 + dread * 10)) * 0.5 + 0.5) * dread * 0.3 or 0
+	-- Proximity is communicated as a restrained pulse; never crush the whole
+	-- scene into black, because the storm lens already shapes the frame edges.
+	local pulse = dread > 0.15 and (math.sin(os.clock() * (6 + dread * 10)) * 0.5 + 0.5) * dread * 0.035 or 0
 	vignette.BackgroundTransparency = if isBlindOne or isPhotoMode
 		then 1
-		else math.clamp(1 - (dread * 0.6 + pulse), 0.3, 1)
+		else math.clamp(1 - (dread * 0.12 + pulse), 0.82, 1)
 end)
