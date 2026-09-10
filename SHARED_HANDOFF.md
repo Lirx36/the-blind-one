@@ -124,6 +124,13 @@ death and respawn with no custom death screen or jumpscare.
   cloth, an elongated pale mask, and two very small controlled white eye lights.
 - No Blender geometry or game integration was changed. Do not start the Blender
   rebuild until the user explicitly approves a concept or requests revisions.
+- Created a non-destructive V2 concept revision at
+  `assets/blind-one-analog/concepts/TheBlindOne_AnalogConcept_V2.png` after the
+  user requested larger eyes. Only the front-view eye design was intentionally
+  changed: the cold-white lights are wider, taller, and more readable while
+  remaining narrow and uncanny. The back view and overall character design were
+  preserved. Blender geometry and the Roblox-native prototype remain unchanged
+  pending the user's approval of V2.
 
 ## Roblox-native analog prototype (2026-09-10)
 
@@ -169,3 +176,33 @@ death and respawn with no custom death screen or jumpscare.
   post-effect value. Other clients and normal gameplay lighting are unaffected.
 - Rojo build and `git diff --check` passed, and the open Studio session received
   the update through the correct Rojo server.
+
+## Analog Blender model pass (2026-09-10)
+
+- The user selected `TheBlindOne_AnalogConcept_V2.png` as the active modeling
+  target and requested very close front/back visual parity.
+- Built a new, non-destructive Blender model family under
+  `assets/blind-one-analog/`; the rejected antler/rib/spike V7 source remains
+  untouched in its original folder.
+- Editable rigged source:
+  `assets/blind-one-analog/blender/TheBlindOne_Analog_V1.blend`.
+- Roblox-ready exports:
+  `TheBlindOne_Analog_V1.glb` and `TheBlindOne_Analog_V1.fbx` in the same folder.
+- The procedural/repeatable source builder is
+  `assets/blind-one-analog/blender/build_blind_one_analog_v1.py`; its visible
+  launcher is `launch_blind_one_analog_v1.ps1`.
+- Rendered review angles are in `assets/blind-one-analog/previews/`: front,
+  three-quarter, and back at 1024x1024.
+- V1 reproduces the selected concept's tall thin silhouette, crooked body and
+  head angle, long arms and narrow hands, ankle-length layered black robe,
+  waist sash, wrapped limbs and hood, elongated cracked pale mask, and the
+  enlarged controlled cold-white V2 eyes. It contains no blood, gore, antlers,
+  exposed ribs, spikes, or teeth.
+- The model has a named Roblox-style bone hierarchy and a subtle 36-frame
+  unsettling idle action. Preview-only stage, camera, lights, and the V2
+  reference image are excluded from GLB/FBX selection exports.
+- Blender 4.5.13 completed the source save, GLB/FBX exports, and all three
+  renders. Blender was left open with the corrected front render visible for
+  the user.
+- This is the first Blender approval pass. Do not replace the live Roblox model
+  until the user approves this appearance or requests the next visual revision.
