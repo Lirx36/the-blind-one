@@ -1,6 +1,6 @@
 # Shared Development Handoff - The Blind One
 
-Last updated: 2026-09-09 on the PC
+Last updated: 2026-09-10 on the PC
 Repository: https://github.com/Lirx36/the-blind-one
 Branch: `main`
 
@@ -113,3 +113,14 @@ The user rejected this experiment and requested complete removal. The client
 overlay, `J` preview, image data, source art/generator, remote event, sound config,
 and server trigger were removed. Monster catches now go directly to normal Roblox
 death and respawn with no custom death screen or jumpscare.
+
+## Analog-horror redesign concept (2026-09-10)
+
+- The user rejected the previous antlered/bark-armored Blind One design and
+  requested a simpler analog-horror direction without blood or gore.
+- Generated a front/back approval sheet at
+  `assets/blind-one-analog/concepts/TheBlindOne_AnalogConcept_V1.png`.
+- Concept V1 uses a tall crooked humanoid silhouette, worn dark institutional
+  cloth, an elongated pale mask, and two very small controlled white eye lights.
+- No Blender geometry or game integration was changed. Do not start the Blender
+  rebuild until the user explicitly approves a concept or requests revisions.
