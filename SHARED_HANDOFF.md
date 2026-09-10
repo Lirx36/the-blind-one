@@ -206,3 +206,26 @@ death and respawn with no custom death screen or jumpscare.
   the user.
 - This is the first Blender approval pass. Do not replace the live Roblox model
   until the user approves this appearance or requests the next visual revision.
+
+### Detailed V2 background rebuild
+
+- Continued the model pass headlessly at the user's request so Blender would not
+  take over the mouse or interrupt other PC use.
+- Preserved every V1 source/export and created a separate detailed V2 family:
+  `TheBlindOne_Analog_V2.blend`, `.glb`, and `.fbx` under
+  `assets/blind-one-analog/blender/`.
+- Added the reproducible V2 builder
+  `build_blind_one_analog_v2.py` and a `launch_blind_one_analog_v2.ps1`
+  wrapper. The shared launcher now supports explicit builder, background, and
+  wait options while retaining its original V1 defaults.
+- Rebuilt the rest silhouette around Concept V2: narrower asymmetrical body,
+  forward/left slump, sloped shoulders, long connected sleeves and articulated
+  hands, layered high-density robe panels, deep pleats, torn hem fibers, rear
+  sash knot/tails, wrapped neck and hood, curved weathered mask, and larger
+  cold-white eye cores with a controlled blue-white halo.
+- Added new 1280x1280 approval renders for front, three-quarter, side, and back
+  under `assets/blind-one-analog/previews/`.
+- GLB structure validation passed: glTF 2.0, 32 nodes, 15 meshes, 8 materials,
+  one skin, and one embedded 48-frame unsettling idle animation.
+- V2 remains an approval asset and is not integrated into the live Roblox model
+  yet. Wait for the user's visual approval before replacing the native prototype.

@@ -1,3 +1,9 @@
+param(
+    [string]$Builder = '',
+    [switch]$Background,
+    [switch]$Wait
+)
+
 $ErrorActionPreference = 'Stop'
 
 $source = @'
@@ -61,8 +67,17 @@ public static class AppActivator
 Add-Type -TypeDefinition $source -Language CSharp
 
 $appId = 'BlenderFoundation.Blender4.5LTS_ppwjx1n5r4v9t!BLENDER'
-$builder = Join-Path $PSScriptRoot 'build_blind_one_analog_v1.py'
-$arguments = '--python "' + $builder + '"'
+if ([string]::IsNullOrWhiteSpace($Builder)) {
+    $Builder = Join-Path $PSScriptRoot 'build_blind_one_analog_v1.py'
+}
+
+$backgroundArgument = if ($Background) { '--background ' } else { '' }
+$arguments = $backgroundArgument + '--python "' + $Builder + '"'
 
 $blenderProcessId = [AppActivator]::Launch($appId, $arguments)
-Write-Output "Activated visible Blender build process $blenderProcessId"
+Write-Output "Activated Blender build process $blenderProcessId (background=$Background)"
+
+if ($Wait) {
+    Wait-Process -Id $blenderProcessId
+    Write-Output "Blender build process $blenderProcessId finished"
+}
