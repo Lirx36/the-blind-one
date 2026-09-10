@@ -124,3 +124,24 @@ death and respawn with no custom death screen or jumpscare.
   cloth, an elongated pale mask, and two very small controlled white eye lights.
 - No Blender geometry or game integration was changed. Do not start the Blender
   rebuild until the user explicitly approves a concept or requests revisions.
+
+## Roblox-native analog prototype (2026-09-10)
+
+- At the user's request, built a test version of Concept V1 entirely from
+  Roblox-native Parts, materials, lights, and welds in
+  `src/ServerScriptService/MonsterAppearance.luau`; Blender was not used.
+- The old `BlindOneRig` / `BlindOneMesh` stored in Studio is now deliberately
+  bypassed, so it cannot silently replace the test appearance again.
+- Both the solo AI and a player-controlled Blind One share this appearance.
+- The new model includes a tall thin silhouette, long robe with front/back
+  panels and cloth folds, uneven shoulders, elongated dark hands and fingers,
+  layered head wrapping, a two-piece pale mask, closed face seam, and two tiny
+  cold-white glowing eyes. It contains no blood, gore, exposed ribs, antlers,
+  teeth, spikes, or red wound lighting.
+- The visual is marked `Articulated = true`, so the existing jointed limp/idle
+  animator drives it instead of treating it as a rigid sliding shell.
+- Rojo build succeeded and produced
+  `the-blind-one-analog-native-test.rbxlx` in the PC temp directory. Roblox
+  Studio was launched with that compiled place for user testing.
+- This is still an approval prototype. Keep the Blender rebuild paused until
+  the user has tested it and chooses whether Concept V1 is final.

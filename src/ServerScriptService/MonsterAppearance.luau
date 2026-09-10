@@ -1,53 +1,53 @@
 --!strict
--- Lightweight, fully procedural skin for a player-controlled Blind One. The
--- player's catalog avatar is hidden (not destroyed), so it can be restored if
--- their role changes without reloading the character.
-local ServerStorage = game:GetService("ServerStorage")
+-- Roblox-native analog-horror appearance shared by the solo AI and the
+-- player-controlled Blind One. It intentionally uses only Parts, WedgeParts,
+-- native materials, lights, and welds: no Blender mesh or uploaded asset.
+-- The player's catalog avatar is hidden rather than destroyed so it can be
+-- restored if their role changes.
 
 local MonsterAppearance = {}
 
 local VISUAL_NAME = "BlindOneVisual"
-local IMPORTED_TEMPLATE_NAME = "BlindOneMesh"
-local RIGGED_TEMPLATE_NAME = "BlindOneRig"
 local ORIGINAL_TRANSPARENCY = "BlindOneOriginalTransparency"
 local ORIGINAL_CAST_SHADOW = "BlindOneOriginalCastShadow"
 local ORIGINAL_SCALE = "BlindOneOriginalScale"
 
-local DARK = Color3.fromRGB(21, 17, 20)
-local DEEP_DARK = Color3.fromRGB(2, 1, 3)
-local BONE = Color3.fromRGB(132, 119, 99)
-local WRAPPING = Color3.fromRGB(68, 57, 51)
-local HORN = Color3.fromRGB(58, 42, 31)
-local WOUND = Color3.fromRGB(135, 8, 5)
-local EYE = Color3.fromRGB(235, 248, 255)
+local CLOTH = Color3.fromRGB(29, 29, 31)
+local CLOTH_LIGHT = Color3.fromRGB(42, 41, 42)
+local CLOTH_DEEP = Color3.fromRGB(8, 8, 10)
+local SKIN = Color3.fromRGB(24, 24, 25)
+local MASK = Color3.fromRGB(172, 168, 154)
+local MASK_SHADOW = Color3.fromRGB(116, 114, 106)
+local SEAM = Color3.fromRGB(12, 12, 14)
+local EYE = Color3.fromRGB(230, 245, 255)
 
 local BODY_SCALES: { [string]: Vector3 } = {
-	UpperTorso = Vector3.new(1.1, 1.08, 1.02),
-	LowerTorso = Vector3.new(0.78, 1.08, 0.88),
-	Torso = Vector3.new(1.08, 1.08, 1.0),
-	LeftUpperArm = Vector3.new(0.88, 1.15, 0.92),
-	RightUpperArm = Vector3.new(0.88, 1.15, 0.92),
-	LeftLowerArm = Vector3.new(1.08, 1.22, 1.04),
-	RightLowerArm = Vector3.new(1.08, 1.22, 1.04),
-	["Left Arm"] = Vector3.new(0.94, 1.16, 0.96),
-	["Right Arm"] = Vector3.new(0.94, 1.16, 0.96),
-	LeftHand = Vector3.new(1.06, 1.24, 1.02),
-	RightHand = Vector3.new(1.06, 1.24, 1.02),
-	LeftUpperLeg = Vector3.new(0.9, 1.13, 0.92),
-	RightUpperLeg = Vector3.new(0.9, 1.13, 0.92),
-	LeftLowerLeg = Vector3.new(0.86, 1.16, 0.9),
-	RightLowerLeg = Vector3.new(0.86, 1.16, 0.9),
-	["Left Leg"] = Vector3.new(0.88, 1.12, 0.9),
-	["Right Leg"] = Vector3.new(0.88, 1.12, 0.9),
-	LeftFoot = Vector3.new(0.96, 1.04, 1.05),
-	RightFoot = Vector3.new(0.96, 1.04, 1.05),
+	UpperTorso = Vector3.new(0.82, 1.14, 0.84),
+	LowerTorso = Vector3.new(0.68, 1.12, 0.78),
+	Torso = Vector3.new(0.82, 1.12, 0.84),
+	LeftUpperArm = Vector3.new(0.7, 1.18, 0.72),
+	RightUpperArm = Vector3.new(0.7, 1.18, 0.72),
+	LeftLowerArm = Vector3.new(0.68, 1.28, 0.7),
+	RightLowerArm = Vector3.new(0.68, 1.28, 0.7),
+	["Left Arm"] = Vector3.new(0.7, 1.2, 0.72),
+	["Right Arm"] = Vector3.new(0.7, 1.2, 0.72),
+	LeftHand = Vector3.new(0.72, 1.2, 0.78),
+	RightHand = Vector3.new(0.72, 1.2, 0.78),
+	LeftUpperLeg = Vector3.new(0.76, 1.16, 0.8),
+	RightUpperLeg = Vector3.new(0.76, 1.16, 0.8),
+	LeftLowerLeg = Vector3.new(0.72, 1.2, 0.76),
+	RightLowerLeg = Vector3.new(0.72, 1.2, 0.76),
+	["Left Leg"] = Vector3.new(0.74, 1.16, 0.78),
+	["Right Leg"] = Vector3.new(0.74, 1.16, 0.78),
+	LeftFoot = Vector3.new(0.84, 1.02, 0.96),
+	RightFoot = Vector3.new(0.84, 1.02, 0.96),
 }
 
 local SCALE_TARGETS: { [string]: number } = {
-	BodyHeightScale = 1.2,
-	BodyWidthScale = 0.82,
-	BodyDepthScale = 0.86,
-	HeadScale = 0.92,
+	BodyHeightScale = 1.28,
+	BodyWidthScale = 0.72,
+	BodyDepthScale = 0.78,
+	HeadScale = 0.82,
 	BodyTypeScale = 0,
 	BodyProportionScale = 0,
 }
@@ -82,27 +82,7 @@ local function weldedPart(
 	part.CFrame = anchor.CFrame * offset
 	part.Parent = visual
 	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = anchor
-	weld.Part1 = part
-	weld.Parent = part
-	return part
-end
-
-local function weldedWedge(
-	visual: Model,
-	anchor: BasePart,
-	name: string,
-	size: Vector3,
-	offset: CFrame,
-	color: Color3,
-	material: Enum.Material
-): WedgePart
-	local part = Instance.new("WedgePart")
-	configurePart(part, name, color, material)
-	part.Size = size
-	part.CFrame = anchor.CFrame * offset
-	part.Parent = visual
-	local weld = Instance.new("WeldConstraint")
+	weld.Name = "AnalogVisualWeld"
 	weld.Part0 = anchor
 	weld.Part1 = part
 	weld.Parent = part
@@ -116,22 +96,34 @@ local function weldedRod(
 	fromLocal: Vector3,
 	toLocal: Vector3,
 	thickness: number,
-	color: Color3
+	color: Color3,
+	material: Enum.Material
 ): Part
 	local fromWorld = anchor.CFrame:PointToWorldSpace(fromLocal)
 	local toWorld = anchor.CFrame:PointToWorldSpace(toLocal)
 	local midpoint = (fromWorld + toWorld) / 2
-	local length = (toWorld - fromWorld).Magnitude
+	local length = math.max((toWorld - fromWorld).Magnitude, 0.05)
 	local part = Instance.new("Part")
-	configurePart(part, name, color, Enum.Material.Slate)
-	part.Size = Vector3.new(thickness, thickness, length)
+	configurePart(part, name, color, material)
+	part.Size = Vector3.new(math.max(thickness, 0.05), math.max(thickness, 0.05), length)
 	part.CFrame = CFrame.lookAt(midpoint, toWorld)
 	part.Parent = visual
 	local weld = Instance.new("WeldConstraint")
+	weld.Name = "AnalogVisualWeld"
 	weld.Part0 = anchor
 	weld.Part1 = part
 	weld.Parent = part
 	return part
+end
+
+local function findPart(character: Model, names: { string }): BasePart?
+	for _, name in names do
+		local candidate = character:FindFirstChild(name)
+		if candidate and candidate:IsA("BasePart") then
+			return candidate
+		end
+	end
+	return nil
 end
 
 local function hideAvatar(character: Model)
@@ -195,12 +187,19 @@ local function addBodyShell(visual: Model, character: Model)
 	for bodyName, scale in BODY_SCALES do
 		local bodyPart = character:FindFirstChild(bodyName)
 		if bodyPart and bodyPart:IsA("BasePart") then
-			local size = Vector3.new(
-				bodyPart.Size.X * scale.X,
-				bodyPart.Size.Y * scale.Y,
-				bodyPart.Size.Z * scale.Z
+			local isHand = string.find(bodyName, "Hand") ~= nil
+			local isFoot = string.find(bodyName, "Foot") ~= nil
+			local color = if isHand then SKIN else CLOTH
+			local material = if isHand or isFoot then Enum.Material.Slate else Enum.Material.Fabric
+			weldedPart(
+				visual,
+				bodyPart,
+				"AnalogBodySegment",
+				Vector3.new(bodyPart.Size.X * scale.X, bodyPart.Size.Y * scale.Y, bodyPart.Size.Z * scale.Z),
+				CFrame.identity,
+				color,
+				material
 			)
-			weldedPart(visual, bodyPart, "ShadowBody", size, CFrame.identity, DARK, Enum.Material.Slate)
 		end
 	end
 end
@@ -215,361 +214,359 @@ local function characterFloorY(character: Model, root: BasePart): number
 	return floorY
 end
 
-local RIG_SEGMENTS: { { string } } = {
-	{ "rightupperleg", "RightUpperLeg", "Right Leg" },
-	{ "rightlowerleg", "RightLowerLeg", "Right Leg" },
-	{ "rightfoot", "RightFoot", "Right Leg" },
-	{ "leftupperleg", "LeftUpperLeg", "Left Leg" },
-	{ "leftlowerleg", "LeftLowerLeg", "Left Leg" },
-	{ "leftfoot", "LeftFoot", "Left Leg" },
-	{ "rightupperarm", "RightUpperArm", "Right Arm" },
-	{ "rightlowerarm", "RightLowerArm", "Right Arm" },
-	{ "righthand", "RightHand", "Right Arm" },
-	{ "leftupperarm", "LeftUpperArm", "Left Arm" },
-	{ "leftlowerarm", "LeftLowerArm", "Left Arm" },
-	{ "lefthand", "LeftHand", "Left Arm" },
-	{ "lowertorso", "LowerTorso", "Torso" },
-	{ "torso", "UpperTorso", "Torso" },
-	{ "head", "Head" },
-}
+local function addFace(visual: Model, head: BasePart)
+	local tilt = CFrame.Angles(math.rad(-3), math.rad(2), math.rad(-7))
+	weldedPart(
+		visual,
+		head,
+		"BlackHeadShroud",
+		Vector3.new(1.42, 1.92, 1.28),
+		CFrame.new(0, 0.06, 0.02) * tilt,
+		CLOTH_DEEP,
+		Enum.Material.Fabric,
+		Enum.PartType.Ball
+	)
+	weldedPart(
+		visual,
+		head,
+		"PaleMaskUpper",
+		Vector3.new(0.9, 0.92, 0.2),
+		CFrame.new(-0.02, 0.13, -0.69) * tilt,
+		MASK,
+		Enum.Material.Concrete,
+		Enum.PartType.Ball
+	)
+	weldedPart(
+		visual,
+		head,
+		"PaleMaskLower",
+		Vector3.new(0.62, 1.05, 0.18),
+		CFrame.new(0.02, -0.45, -0.68) * tilt,
+		MASK_SHADOW,
+		Enum.Material.Concrete,
+		Enum.PartType.Ball
+	)
 
-local function rigTarget(character: Model, importedPart: BasePart, importedRoot: Instance): BasePart?
-	-- glTF imports commonly create a named Model node containing a MeshPart
-	-- called "default". Read the complete ancestry instead of trusting only the
-	-- leaf MeshPart name.
-	local namePath = importedPart.Name
-	local ancestor = importedPart.Parent
-	while ancestor and ancestor ~= importedRoot do
-		namePath ..= ancestor.Name
-		ancestor = ancestor.Parent
-	end
-	local compactName = string.lower(namePath):gsub("[^%a]", "")
-	for _, mapping in RIG_SEGMENTS do
-		if string.find(compactName, mapping[1], 1, true) then
-			for index = 2, #mapping do
-				local candidate = character:FindFirstChild(mapping[index])
-				if candidate and candidate:IsA("BasePart") then
-					return candidate
-				end
-			end
-		end
-	end
-	return nil
-end
-
-local function addImportedMonster(visual: Model, character: Model): boolean
-	local template = ServerStorage:FindFirstChild(RIGGED_TEMPLATE_NAME)
-		or ServerStorage:FindFirstChild(IMPORTED_TEMPLATE_NAME)
-	local root = character:FindFirstChild("HumanoidRootPart")
-	if not template or not root or not root:IsA("BasePart") then
-		return false
-	end
-
-	local clone = template:Clone()
-	clone.Name = "ImportedMonster"
-	clone.Parent = visual
-	-- Freeze the asset before doing any scaling, hierarchy detection, or visual
-	-- configuration. Even if Studio imported an unusual property, no loose limb
-	-- can enter the physics simulation and fall away from the character.
-	if clone:IsA("BasePart") then
-		clone.Anchored = true
-	end
-	for _, descendant in clone:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored = true
-			descendant.CanCollide = false
-			descendant.CanTouch = false
-			descendant.CanQuery = false
-		end
+	for index, data in {
+		{ 0.24, -8 },
+		{ 0.13, 5 },
+		{ 0.03, -3 },
+	} do
+		local band = weldedPart(
+			visual,
+			head,
+			"BlindfoldLayer",
+			Vector3.new(1.18 + index * 0.045, 0.18, 0.12),
+			CFrame.new(0, data[1], -0.82) * CFrame.Angles(0, 0, math.rad(data[2])),
+			CLOTH_DEEP,
+			Enum.Material.Fabric
+		)
+		band.CastShadow = false
 	end
 
-	local desiredHeight = 9.2
-	local floorY = characterFloorY(character, root)
-	-- Roblox characters look along local -Z, while both authored monster assets
-	-- present their detailed face on local +Z. Turn the complete shell around so
-	-- its textured face, eye anchors, and movement direction all agree.
-	local rotation = root.CFrame.Rotation * CFrame.Angles(0, math.rad(180), 0)
-	local desiredBox = CFrame.new(root.Position.X, floorY + desiredHeight / 2, root.Position.Z) * rotation
-	local importedParts: { BasePart } = {}
-
-	if clone:IsA("BasePart") then
-		local scale = desiredHeight / math.max(clone.Size.Y, 0.01)
-		clone.Size *= scale
-		clone.CFrame = desiredBox
-		table.insert(importedParts, clone)
-	elseif clone:IsA("Model") then
-		local _, initialSize = clone:GetBoundingBox()
-		local scale = desiredHeight / math.max(initialSize.Y, 0.01)
-		clone:ScaleTo(clone:GetScale() * scale)
-		local boxCFrame = clone:GetBoundingBox()
-		local delta = desiredBox * boxCFrame:Inverse()
-		clone:PivotTo(delta * clone:GetPivot())
-		for _, descendant in clone:GetDescendants() do
-			if descendant:IsA("BasePart") then
-				table.insert(importedParts, descendant)
-			end
-		end
-	else
-		clone:Destroy()
-		return false
+	for _, side in { -1, 1 } do
+		weldedPart(
+			visual,
+			head,
+			"BlindfoldWrap",
+			Vector3.new(0.2, 0.52, 0.82),
+			CFrame.new(0.65 * side, 0.12, -0.02) * CFrame.Angles(0, 0, math.rad(8 * side)),
+			CLOTH,
+			Enum.Material.Fabric
+		)
 	end
 
-	local rigTargets: { [BasePart]: BasePart } = {}
-	local matchedSegments = 0
-	for _, part in importedParts do
-		local target = rigTarget(character, part, clone)
-		if target then
-			rigTargets[part] = target
-			matchedSegments += 1
-		end
-	end
-	local articulated = template.Name == RIGGED_TEMPLATE_NAME and matchedSegments >= 8
-	visual:SetAttribute("Articulated", articulated)
-
-	local rigAnchor: BasePart? = nil
-	if not articulated then
-		-- Backward-compatible support for the original one-piece mesh.
-		local anchor = Instance.new("Part")
-		configurePart(anchor, "ImportedRigAnchor", Vector3.new(0.2, 0.2, 0.2), DEEP_DARK, Enum.Material.SmoothPlastic)
-		anchor.Transparency = 1
-		anchor.CastShadow = false
-		anchor.CFrame = desiredBox
-		anchor.Parent = visual
-		rigAnchor = anchor
-
-		local visualMotor = Instance.new("Motor6D")
-		visualMotor.Name = "BlindOneVisualMotor"
-		visualMotor.Part0 = root
-		visualMotor.Part1 = anchor
-		visualMotor.C0 = root.CFrame:ToObjectSpace(desiredBox)
-		visualMotor.C1 = CFrame.identity
-		visualMotor.Parent = anchor
-	end
-
-	for _, part in importedParts do
-		part.Massless = true
-		part.Material = Enum.Material.SmoothPlastic
-		part.Reflectance = 0
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.CastShadow = true
-		if part:IsA("MeshPart") then
-			-- These importer properties are not writable in every Studio/runtime
-			-- version. They are cosmetic, so never let one block the attachment.
-			pcall(function()
-				part.RenderFidelity = Enum.RenderFidelity.Precise
-				part.DoubleSided = true
-			end)
-		end
-		local jointAnchor = if articulated then (rigTargets[part] or root) else (rigAnchor or root)
-		local attachment = Instance.new("WeldConstraint")
-		attachment.Name = "BlindOneSegmentJoint"
-		attachment.Part0 = jointAnchor
-		attachment.Part1 = part
-		attachment.Parent = part
-		part.Anchored = false
-	end
-
-	local eyeAnchor: BasePart = root
-	if articulated then
-		for _, part in importedParts do
-			if rigTargets[part] == character:FindFirstChild("Head") then
-				eyeAnchor = part
-				break
-			end
-		end
-	elseif rigAnchor then
-		eyeAnchor = rigAnchor
-	end
-
-	-- The concept texture supplies the detailed eyes; these tiny Neon slits give
-	-- them the same cold glow in the game's nearly black lighting.
-	-- glTF's authored front is +Z after Studio import; the legacy OBJ backup is
-	-- corrected to face -Z by its 180-degree rotation above.
-	local eyeDepth = if template.Name == RIGGED_TEMPLATE_NAME then 0.88 else -0.88
-	local haloDepth = if eyeDepth > 0 then 0.018 else -0.018
-	for _, x in { -0.25, 0.25 } do
-		local worldEye = desiredBox * CFrame.new(x, 2.42, eyeDepth)
+	for _, x in { -0.2, 0.2 } do
 		local eye = weldedPart(
 			visual,
-			eyeAnchor,
-			"ImportedBlindEye",
-			Vector3.new(0.14, 0.045, 0.04),
-			eyeAnchor.CFrame:ToObjectSpace(worldEye),
+			head,
+			"PinpointBlindEye",
+			Vector3.new(0.075, 0.038, 0.035),
+			CFrame.new(x, 0.17, -0.9),
 			EYE,
-			Enum.Material.Neon
+			Enum.Material.Neon,
+			Enum.PartType.Ball
 		)
 		eye.CastShadow = false
 		local halo = weldedPart(
 			visual,
-			eyeAnchor,
-			"ImportedEyeHalo",
-			Vector3.new(0.27, 0.11, 0.025),
-			eyeAnchor.CFrame:ToObjectSpace(worldEye * CFrame.new(0, 0, haloDepth)),
-			Color3.fromRGB(195, 229, 245),
+			head,
+			"EyeLeak",
+			Vector3.new(0.16, 0.075, 0.025),
+			CFrame.new(x, 0.17, -0.914),
+			EYE,
 			Enum.Material.Neon
 		)
-		halo.Transparency = 0.72
+		halo.Transparency = 0.74
 		halo.CastShadow = false
-		local glow = Instance.new("PointLight")
-		glow.Color = EYE
-		glow.Brightness = 0.78
-		glow.Range = 4.5
-		glow.Shadows = false
-		glow.Parent = eye
+		local light = Instance.new("PointLight")
+		light.Name = "ColdEyeGlow"
+		light.Color = EYE
+		light.Brightness = 0.28
+		light.Range = 2.6
+		light.Shadows = false
+		light.Parent = eye
 	end
 
-	-- Imported rigs used to return before receiving the shadow aura. The lantern
-	-- controller darkens this overlay when its beam hits the creature, preserving
-	-- the frightening silhouette instead of washing the texture orange.
-	local aura = Instance.new("Highlight")
-	aura.Name = "DarkAura"
-	aura.Adornee = visual
-	aura.DepthMode = Enum.HighlightDepthMode.Occluded
-	aura.FillColor = Color3.fromRGB(0, 0, 0)
-	aura.FillTransparency = 0.88
-	aura.OutlineColor = Color3.fromRGB(125, 25, 18)
-	aura.OutlineTransparency = 0.22
-	aura.Parent = visual
+	weldedPart(
+		visual,
+		head,
+		"ClosedFaceSeam",
+		Vector3.new(0.04, 0.5, 0.03),
+		CFrame.new(0.025, -0.47, -0.79) * CFrame.Angles(0, 0, math.rad(-3)),
+		SEAM,
+		Enum.Material.SmoothPlastic
+	)
 
-	return true
-end
-
-local function addFace(visual: Model, head: BasePart)
-	weldedPart(visual, head, "CrackedCowl", Vector3.new(1.82, 2.06, 1.72), CFrame.new(0, 0.03, 0), DARK, Enum.Material.Slate, Enum.PartType.Ball)
-	weldedPart(visual, head, "EyeBandage", Vector3.new(1.84, 0.44, 0.17), CFrame.new(0, 0.24, -0.89), WRAPPING, Enum.Material.Fabric)
-
-	for _, x in { -0.32, 0.32 } do
-		local eye = weldedPart(visual, head, "BlindEye", Vector3.new(0.28, 0.105, 0.08), CFrame.new(x, 0.24, -1), EYE, Enum.Material.Neon)
-		if x < 0 then
-			local glow = Instance.new("PointLight")
-			glow.Name = "EyeGlow"
-			glow.Color = EYE
-			glow.Brightness = 1.8
-			glow.Range = 8
-			glow.Shadows = false
-			glow.Parent = eye
-		end
-	end
-
-	for index, x in { -0.58, -0.19, 0.19, 0.58 } do
-		weldedPart(
+	for _, x in { -0.43, 0.46 } do
+		weldedRod(
 			visual,
 			head,
-			"BandageStitch",
-			Vector3.new(0.065, 0.54, 0.065),
-			CFrame.new(x, 0.24, -1.015) * CFrame.Angles(0, 0, math.rad(if index % 2 == 0 then 15 else -15)),
-			BONE,
-			Enum.Material.Slate
+			"HangingHeadThread",
+			Vector3.new(x, -0.52, 0.22),
+			Vector3.new(x * 1.08, -1.18, 0.28),
+			0.05,
+			CLOTH_DEEP,
+			Enum.Material.Fabric
 		)
 	end
-
-	local mouth = weldedPart(visual, head, "VerticalMaw", Vector3.new(0.4, 0.73, 0.11), CFrame.new(0, -0.49, -0.92), DEEP_DARK, Enum.Material.SmoothPlastic)
-	local mouthGlow = Instance.new("PointLight")
-	mouthGlow.Name = "MawGlow"
-	mouthGlow.Color = WOUND
-	mouthGlow.Brightness = 0.48
-	mouthGlow.Range = 5
-	mouthGlow.Shadows = true
-	mouthGlow.Parent = mouth
-	for _, x in { -0.1, 0.1 } do
-		for _, y in { -0.16, 0.16 } do
-			weldedPart(visual, head, "MawTooth", Vector3.new(0.09, 0.17, 0.08), CFrame.new(x, -0.49 + y, -1), BONE, Enum.Material.Slate)
-		end
-	end
 end
 
-local function addAntlers(visual: Model, head: BasePart)
-	for _, side in { -1, 1 } do
-		local s = side
-		weldedRod(visual, head, "Antler", Vector3.new(0.54 * s, 0.72, 0.08), Vector3.new(0.79 * s, 1.31, 0.04), 0.24, HORN)
-		weldedRod(visual, head, "Antler", Vector3.new(0.79 * s, 1.31, 0.04), Vector3.new(1.18 * s, 1.84, 0), 0.21, HORN)
-		weldedRod(visual, head, "AntlerBranch", Vector3.new(0.86 * s, 1.42, 0.02), Vector3.new(0.58 * s, 1.91, -0.02), 0.16, HORN)
-		weldedRod(visual, head, "AntlerBranch", Vector3.new(1.03 * s, 1.64, 0.01), Vector3.new(1.38 * s, 1.98, -0.03), 0.14, HORN)
-		weldedRod(visual, head, "AntlerTip", Vector3.new(1.18 * s, 1.84, 0), Vector3.new(1.08 * s, 2.23, -0.04), 0.13, BONE)
-	end
-end
+local function addUpperGarment(visual: Model, torso: BasePart)
+	local front = -(torso.Size.Z / 2 + 0.12)
+	local back = torso.Size.Z / 2 + 0.12
+	weldedPart(
+		visual,
+		torso,
+		"RobeChest",
+		Vector3.new(torso.Size.X * 1.03, torso.Size.Y * 1.12, torso.Size.Z * 1.12),
+		CFrame.new(0, -0.05, 0),
+		CLOTH,
+		Enum.Material.Fabric
+	)
 
-local function addChest(visual: Model, torso: BasePart)
-	local front = -(torso.Size.Z / 2 + 0.09)
-	weldedPart(visual, torso, "SplitChest", Vector3.new(0.24, math.min(1.55, torso.Size.Y * 0.78), 0.1), CFrame.new(0, 0.04, front - 0.02), WOUND, Enum.Material.Neon)
-	for index, y in { 0.48, 0.2, -0.08, -0.36 } do
-		local reach = math.max(0.88, torso.Size.X * 0.48 - index * 0.025)
-		for _, side in { -1, 1 } do
-			local s = side
-			local middle = Vector3.new(reach * 0.58 * s, y + 0.02, front - 0.06)
-			weldedRod(visual, torso, "ExposedRib", Vector3.new(0.1 * s, y, front - 0.08), middle, 0.13, BONE)
-			weldedRod(visual, torso, "ExposedRib", middle, Vector3.new(reach * s, y - 0.16, front + 0.02), 0.12, BONE)
-		end
+	for _, data in {
+		{ 0.62, 2.18, -7 },
+		{ 0.43, 2.02, 4 },
+		{ 0.24, 1.88, -2 },
+	} do
+		weldedPart(
+			visual,
+			torso,
+			"CowlFold",
+			Vector3.new(data[2], 0.23, 0.22),
+			CFrame.new(0, data[1], front - 0.03) * CFrame.Angles(0, 0, math.rad(data[3])),
+			CLOTH_LIGHT,
+			Enum.Material.Fabric
+		)
 	end
 
 	for _, side in { -1, 1 } do
 		weldedPart(
 			visual,
 			torso,
-			"ShoulderMass",
-			Vector3.new(1.12, 1.18, 1.08),
-			CFrame.new((torso.Size.X / 2 + 0.4) * side, 0.35, 0.03),
-			DARK,
-			Enum.Material.Slate,
-			Enum.PartType.Ball
+			"DroopingShoulderCloth",
+			Vector3.new(0.78, if side < 0 then 0.72 else 0.52, torso.Size.Z * 1.2),
+			CFrame.new((torso.Size.X / 2 + 0.22) * side, if side < 0 then 0.28 else 0.39, 0.02)
+				* CFrame.Angles(0, 0, math.rad(11 * side)),
+			if side < 0 then CLOTH_LIGHT else CLOTH,
+			Enum.Material.Fabric
 		)
-		weldedWedge(
+	end
+
+	local backDrape = weldedPart(
+		visual,
+		torso,
+		"BackDrape",
+		Vector3.new(torso.Size.X * 0.92, torso.Size.Y * 1.45, 0.2),
+		CFrame.new(0.08, -0.3, back) * CFrame.Angles(math.rad(2), 0, math.rad(4)),
+		CLOTH_LIGHT,
+		Enum.Material.Fabric
+	)
+	backDrape.CastShadow = true
+
+	for _, x in { -0.47, -0.17, 0.18, 0.48 } do
+		local fold = weldedPart(
 			visual,
 			torso,
-			"ShoulderSpike",
-			Vector3.new(0.5, 1.22, 0.54),
-			CFrame.new((torso.Size.X / 2 + 0.48) * side, 0.82, 0.02) * CFrame.Angles(0, math.rad(90), math.rad(-58 * side)),
-			BONE,
-			Enum.Material.Slate
+			"FrontClothFold",
+			Vector3.new(0.05, torso.Size.Y * 0.8, 0.05),
+			CFrame.new(x * torso.Size.X * 0.72, -0.12, front - 0.135),
+			CLOTH_DEEP,
+			Enum.Material.SmoothPlastic
 		)
-		weldedWedge(
+		fold.Transparency = 0.18
+		fold.CastShadow = false
+	end
+
+	weldedPart(
+		visual,
+		torso,
+		"BackCenterSeam",
+		Vector3.new(0.05, torso.Size.Y * 1.18, 0.05),
+		CFrame.new(0.08, -0.28, back + 0.12),
+		CLOTH_DEEP,
+		Enum.Material.SmoothPlastic
+	)
+end
+
+local function addLongRobe(visual: Model, character: Model, lowerTorso: BasePart, root: BasePart)
+	local floorY = characterFloorY(character, root)
+	local drop = math.clamp(lowerTorso.Position.Y - floorY - 0.12, 2.7, 3.7)
+	local panelWidth = math.max(0.62, lowerTorso.Size.X * 0.56)
+	local panelDepth = math.max(0.32, lowerTorso.Size.Z * 0.48)
+	local xOffset = panelWidth * 0.54
+	local front = -(lowerTorso.Size.Z / 2 + panelDepth * 0.36)
+	local back = lowerTorso.Size.Z / 2 + panelDepth * 0.36
+	local centerY = -(drop / 2 - 0.32)
+
+	for _, side in { -1, 1 } do
+		weldedPart(
 			visual,
-			torso,
-			"HangingShoulderTatter",
-			Vector3.new(0.52, 1.75, 0.24),
-			CFrame.new((torso.Size.X / 2 + 0.48) * side, -0.52, 0.2) * CFrame.Angles(0, 0, math.rad(7 * side)),
-			DEEP_DARK,
+			lowerTorso,
+			"FrontRobePanel",
+			Vector3.new(panelWidth, drop, panelDepth),
+			CFrame.new(xOffset * side, centerY, front) * CFrame.Angles(math.rad(-1), 0, math.rad(-2.5 * side)),
+			if side < 0 then CLOTH else CLOTH_LIGHT,
+			Enum.Material.Fabric
+		)
+		weldedPart(
+			visual,
+			lowerTorso,
+			"BackRobePanel",
+			Vector3.new(panelWidth, drop * 0.98, panelDepth),
+			CFrame.new(xOffset * side, centerY + 0.04, back) * CFrame.Angles(math.rad(1), 0, math.rad(2 * side)),
+			CLOTH,
+			Enum.Material.Fabric
+		)
+	end
+
+	for _, side in { -1, 1 } do
+		weldedPart(
+			visual,
+			lowerTorso,
+			"SideRobePanel",
+			Vector3.new(0.2, drop * 0.9, lowerTorso.Size.Z * 1.18),
+			CFrame.new((panelWidth + 0.18) * side, centerY + 0.08, 0),
+			CLOTH_DEEP,
+			Enum.Material.Fabric
+		)
+	end
+
+	for index, x in { -0.72, -0.36, 0, 0.34, 0.7 } do
+		local length = 0.26 + (index % 3) * 0.12
+		weldedPart(
+			visual,
+			lowerTorso,
+			"FrayedHem",
+			Vector3.new(0.2, length, 0.22),
+			CFrame.new(x, 0.3 - drop - length / 2, front - 0.04) * CFrame.Angles(0, 0, math.rad((index - 3) * 3)),
+			CLOTH_DEEP,
+			Enum.Material.Fabric
+		)
+	end
+
+	for _, x in { -0.48, -0.16, 0.2, 0.52 } do
+		local fold = weldedPart(
+			visual,
+			lowerTorso,
+			"LongRobeFold",
+			Vector3.new(0.05, drop * 0.74, 0.05),
+			CFrame.new(x, centerY - 0.08, front - panelDepth / 2 - 0.025),
+			CLOTH_DEEP,
+			Enum.Material.SmoothPlastic
+		)
+		fold.Transparency = 0.16
+		fold.CastShadow = false
+	end
+
+	weldedPart(visual, lowerTorso, "ClothBeltFront", Vector3.new(1.72, 0.16, 0.18), CFrame.new(0, 0.34, front - 0.08), CLOTH_LIGHT, Enum.Material.Fabric)
+	weldedPart(visual, lowerTorso, "ClothBeltBack", Vector3.new(1.72, 0.16, 0.18), CFrame.new(0, 0.34, back + 0.08), CLOTH_LIGHT, Enum.Material.Fabric)
+	for _, side in { -1, 1 } do
+		weldedPart(visual, lowerTorso, "ClothBeltSide", Vector3.new(0.16, 0.16, lowerTorso.Size.Z * 1.2), CFrame.new(0.86 * side, 0.34, 0), CLOTH_LIGHT, Enum.Material.Fabric)
+	end
+	weldedPart(visual, lowerTorso, "BeltKnot", Vector3.new(0.28, 0.24, 0.2), CFrame.new(0.2, 0.3, back + 0.18), CLOTH_LIGHT, Enum.Material.Fabric, Enum.PartType.Ball)
+	for _, x in { 0.1, 0.31 } do
+		weldedPart(
+			visual,
+			lowerTorso,
+			"BackSashTail",
+			Vector3.new(0.17, drop * 0.63, 0.12),
+			CFrame.new(x, -(drop * 0.34), back + 0.16) * CFrame.Angles(math.rad(2), 0, math.rad(if x < 0.2 then -4 else 5)),
+			CLOTH_LIGHT,
 			Enum.Material.Fabric
 		)
 	end
 end
 
-local function addClaws(visual: Model, hand: BasePart, side: number)
-	for index, x in { -0.19, 0, 0.19 } do
-		weldedWedge(
+local function addLimbWraps(visual: Model, limb: BasePart, prefix: string)
+	for index, y in { -0.22, 0.14 } do
+		weldedPart(
+			visual,
+			limb,
+			prefix .. "Wrap",
+			Vector3.new(limb.Size.X * 0.92, 0.11, limb.Size.Z * 0.92),
+			CFrame.new(0, y * limb.Size.Y, 0) * CFrame.Angles(0, 0, math.rad(if index == 1 then -6 else 5)),
+			CLOTH_LIGHT,
+			Enum.Material.Fabric
+		)
+	end
+end
+
+local function addHand(visual: Model, hand: BasePart, side: number)
+	local palmHeight = math.clamp(hand.Size.Y * 0.9, 0.7, 1)
+	local palmCenterY = -(hand.Size.Y / 2 + palmHeight / 2 - 0.2)
+	weldedPart(
+		visual,
+		hand,
+		"LongPalm",
+		Vector3.new(0.46, palmHeight, 0.3),
+		CFrame.new(0, palmCenterY, -0.02) * CFrame.Angles(math.rad(3), 0, math.rad(2 * side)),
+		SKIN,
+		Enum.Material.Slate
+	)
+
+	local fingerTop = palmCenterY - palmHeight / 2 + 0.12
+	for index, x in { -0.18, -0.06, 0.06, 0.18 } do
+		local outer = math.abs(index - 2.5) / 1.5
+		weldedRod(
 			visual,
 			hand,
-			"Claw",
-			Vector3.new(0.15, 1.08, 0.18),
-			CFrame.new(x, -(hand.Size.Y / 2 + 0.5), -0.08) * CFrame.Angles(math.rad(8), 0, math.rad((index - 2) * 11 * side)),
-			BONE,
+			"LongFinger",
+			Vector3.new(x, fingerTop, -0.03),
+			Vector3.new(x + (index - 2.5) * 0.055 * side, fingerTop - 0.62 - outer * 0.12, -0.08),
+			0.055,
+			SKIN,
 			Enum.Material.Slate
 		)
 	end
 end
 
-local function addTatters(visual: Model, torso: BasePart)
-	for index, data in {
-		{ -0.62, 1.15, -7 },
-		{ -0.31, 1.55, 4 },
-		{ 0, 1.8, -2 },
-		{ 0.31, 1.42, 6 },
-		{ 0.62, 1.08, -5 },
-	} do
-		local x = data[1]
-		local length = data[2]
-		local angle = data[3]
-		weldedWedge(
-			visual,
-			torso,
-			"ShadowTatter",
-			Vector3.new(if index == 3 then 0.38 else 0.3, length, 0.18),
-			CFrame.new(x, -(torso.Size.Y / 2 + length / 2 - 0.12), 0.12) * CFrame.Angles(0, 0, math.rad(angle)),
-			DEEP_DARK,
-			Enum.Material.Fabric
-		)
+local function addLimbDetails(visual: Model, character: Model)
+	local leftLowerArm = findPart(character, { "LeftLowerArm", "Left Arm" })
+	local rightLowerArm = findPart(character, { "RightLowerArm", "Right Arm" })
+	local leftLowerLeg = findPart(character, { "LeftLowerLeg", "Left Leg" })
+	local rightLowerLeg = findPart(character, { "RightLowerLeg", "Right Leg" })
+	if leftLowerArm then
+		addLimbWraps(visual, leftLowerArm, "LeftCuff")
+	end
+	if rightLowerArm then
+		addLimbWraps(visual, rightLowerArm, "RightCuff")
+	end
+	if leftLowerLeg then
+		addLimbWraps(visual, leftLowerLeg, "LeftAnkle")
+	end
+	if rightLowerLeg then
+		addLimbWraps(visual, rightLowerLeg, "RightAnkle")
+	end
+
+	local leftHand = findPart(character, { "LeftHand", "Left Arm" })
+	local rightHand = findPart(character, { "RightHand", "Right Arm" })
+	if leftHand then
+		addHand(visual, leftHand, -1)
+	end
+	if rightHand then
+		addHand(visual, rightHand, 1)
 	end
 end
 
@@ -579,52 +576,39 @@ function MonsterAppearance.Apply(character: Model)
 
 	local visual = Instance.new("Model")
 	visual.Name = VISUAL_NAME
+	visual:SetAttribute("Articulated", true)
+	visual:SetAttribute("DesignVersion", "AnalogNativeV1")
+	visual:SetAttribute("UsesImportedAsset", false)
 	visual.Parent = character
-	local importedOk, importedResult = pcall(addImportedMonster, visual, character)
-	if importedOk and importedResult then
-		return
-	end
-	if not importedOk then
-		warn("Blind One imported rig failed; using safe procedural fallback:", importedResult)
-	end
-	visual:ClearAllChildren()
-	visual:SetAttribute("Articulated", false)
 
 	addBodyShell(visual, character)
 
-	local head = character:FindFirstChild("Head")
-	if head and head:IsA("BasePart") then
+	local head = findPart(character, { "Head" })
+	if head then
 		addFace(visual, head)
-		addAntlers(visual, head)
 	end
 
-	local upperTorso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
-	if upperTorso and upperTorso:IsA("BasePart") then
-		addChest(visual, upperTorso)
+	local upperTorso = findPart(character, { "UpperTorso", "Torso" })
+	if upperTorso then
+		addUpperGarment(visual, upperTorso)
 	end
 
-	local lowerTorso = character:FindFirstChild("LowerTorso") or upperTorso
-	if lowerTorso and lowerTorso:IsA("BasePart") then
-		addTatters(visual, lowerTorso)
+	local lowerTorso = findPart(character, { "LowerTorso", "Torso" })
+	local root = findPart(character, { "HumanoidRootPart" })
+	if lowerTorso and root then
+		addLongRobe(visual, character, lowerTorso, root)
 	end
 
-	local rightHand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
-	local leftHand = character:FindFirstChild("LeftHand") or character:FindFirstChild("Left Arm")
-	if rightHand and rightHand:IsA("BasePart") then
-		addClaws(visual, rightHand, 1)
-	end
-	if leftHand and leftHand:IsA("BasePart") then
-		addClaws(visual, leftHand, -1)
-	end
+	addLimbDetails(visual, character)
 
 	local aura = Instance.new("Highlight")
 	aura.Name = "DarkAura"
 	aura.Adornee = visual
 	aura.DepthMode = Enum.HighlightDepthMode.Occluded
-	aura.FillColor = Color3.fromRGB(3, 2, 5)
-	aura.FillTransparency = 0.88
-	aura.OutlineColor = Color3.fromRGB(125, 25, 18)
-	aura.OutlineTransparency = 0.22
+	aura.FillColor = Color3.fromRGB(0, 0, 0)
+	aura.FillTransparency = 0.93
+	aura.OutlineColor = Color3.fromRGB(62, 64, 68)
+	aura.OutlineTransparency = 0.62
 	aura.Parent = visual
 end
 
