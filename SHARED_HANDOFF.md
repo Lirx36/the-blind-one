@@ -329,3 +329,19 @@ death and respawn with no custom death screen or jumpscare.
 - GitHub had no incoming laptop changes. Rojo build and `git diff --check`
   passed, producing `build/the-blind-one-town-v2-test.rbxlx`; the correct Rojo
   server remained live on port 34872.
+
+### Flashlight beam-direction hotfix
+
+- V2 testing showed the beam illuminating the left wall while the player looked
+  forward. Root cause: the SpotLights were children of the cylindrical lens;
+  the 90-degree rotation needed to orient the cylinder also rotated its Roblox
+  `Front` face—and therefore both SpotLights—sideways.
+- Added a tiny invisible, unrotated `BeamEmitter` at the physical lens and moved
+  the focused and spill SpotLights to it. The visible lens keeps its correct
+  cylindrical orientation, while illumination now follows the flashlight
+  model's true forward axis and camera crosshair.
+- The user also noted that V2's fog was effectively invisible against the dark
+  horizon. Bumped the map to `HollowSettlement_3`, pulled legacy fog from
+  24-158 studs, brightened it to a cold grey, and increased Atmosphere density
+  and haze. Nearby flashlight space stays readable while streets and buildings
+  now dissolve into a visible grey fog wall like the reference.

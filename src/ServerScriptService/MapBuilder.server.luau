@@ -5,7 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local MAP_VERSION = "HollowSettlement_2"
+local MAP_VERSION = "HollowSettlement_3"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
 if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then
 	return
@@ -82,9 +82,9 @@ Lighting.EnvironmentSpecularScale = 0.82
 Lighting.GlobalShadows = true
 Lighting.ShadowSoftness = 0.62
 Lighting.ExposureCompensation = 0.12
-Lighting.FogColor = Color3.fromRGB(61, 68, 72)
-Lighting.FogStart = 38
-Lighting.FogEnd = 215
+Lighting.FogColor = Color3.fromRGB(91, 99, 103)
+Lighting.FogStart = 24
+Lighting.FogEnd = 158
 
 for _, effect in Lighting:GetChildren() do
 	if effect.Name == "TheHollowGrade" or effect.Name == "TheHollowAtmosphere" or effect.Name == "TheHollowBloom" or effect.Name == "TheHollowDepth" then
@@ -103,8 +103,8 @@ grade.Parent = Lighting
 
 local atmosphere = Instance.new("Atmosphere")
 atmosphere.Name = "TheHollowAtmosphere"
-atmosphere.Color, atmosphere.Decay = Color3.fromRGB(112, 122, 125), Color3.fromRGB(34, 42, 47)
-atmosphere.Density, atmosphere.Haze, atmosphere.Glare, atmosphere.Offset = 0.27, 1.85, 0, -0.18
+atmosphere.Color, atmosphere.Decay = Color3.fromRGB(134, 142, 145), Color3.fromRGB(53, 61, 65)
+atmosphere.Density, atmosphere.Haze, atmosphere.Glare, atmosphere.Offset = 0.35, 2.55, 0, -0.12
 atmosphere.Parent = Lighting
 
 local bloom = Instance.new("BloomEffect")

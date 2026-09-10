@@ -55,6 +55,11 @@ makePart("Bezel", Vector3.new(0.12, 0.67, 0.67), edgeMetal, Enum.Material.Metal,
 local lens = makePart("Lens", Vector3.new(0.045, 0.55, 0.55), Color3.fromRGB(172, 189, 193), Enum.Material.Glass, CFrame.new(0, 0, -1.38) * axisForward, Enum.PartType.Cylinder, 0.24)
 makePart("Switch", Vector3.new(0.2, 0.09, 0.18), Color3.fromRGB(91, 99, 101), Enum.Material.Metal, CFrame.new(0, 0.2, -0.38))
 
+-- Cylinder geometry needs a 90-degree rotation to point forward, which also
+-- rotates its Front face sideways. Keep lighting on an unrotated invisible
+-- emitter so both SpotLights always follow the model's true -Z/look direction.
+local beamEmitter = makePart("BeamEmitter", Vector3.new(0.03, 0.03, 0.03), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, CFrame.new(0, 0, -1.41), nil, 1)
+
 for index = 1, 6 do
 	makePart("GripRib", Vector3.new(0.045, 0.38, 0.38), edgeMetal, Enum.Material.Metal, CFrame.new(0, 0, 0.42 - index * 0.13) * axisForward, Enum.PartType.Cylinder)
 end
@@ -67,7 +72,7 @@ hotspot.Brightness = 6.4
 hotspot.Range = 82
 hotspot.Angle = 48
 hotspot.Shadows = true
-hotspot.Parent = lens
+hotspot.Parent = beamEmitter
 
 local spill = Instance.new("SpotLight")
 spill.Name = "SoftSpill"
@@ -77,7 +82,7 @@ spill.Brightness = 1.8
 spill.Range = 52
 spill.Angle = 92
 spill.Shadows = false
-spill.Parent = lens
+spill.Parent = beamEmitter
 
 local nearFill = Instance.new("PointLight")
 nearFill.Name = "NearFill"
@@ -85,7 +90,7 @@ nearFill.Color = Color3.fromRGB(184, 197, 200)
 nearFill.Brightness = 0.26
 nearFill.Range = 7
 nearFill.Shadows = false
-nearFill.Parent = lens
+nearFill.Parent = beamEmitter
 
 local rightHand: BasePart? = nil
 local lightEnabled = true
