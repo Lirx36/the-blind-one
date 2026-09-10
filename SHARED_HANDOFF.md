@@ -145,3 +145,17 @@ death and respawn with no custom death screen or jumpscare.
   Studio was launched with that compiled place for user testing.
 - This is still an approval prototype. Keep the Blender rebuild paused until
   the user has tested it and chooses whether Concept V1 is final.
+
+### Stuck-AI fix
+
+- The first user playtest showed the solo AI standing still. Studio's live log
+  confirmed the map and monster scripts loaded without a Luau runtime error;
+  the movement loop could receive no usable path waypoint and then idle.
+- Reduced the collisionless monster's path-planning radius from 3 to 2.25 studs
+  and added five-stud waypoint spacing.
+- Added direct steering whenever Roblox pathfinding fails or returns a
+  zero-length path, plus recovery when the final waypoint is exhausted. The AI
+  now keeps patrolling/pursuing while it retries normal paths instead of being
+  permanently stuck.
+- Rojo build and `git diff --check` passed after the fix. The already-open
+  Studio session remains connected to the correct PC Rojo server for retesting.

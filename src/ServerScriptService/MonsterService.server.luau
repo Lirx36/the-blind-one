@@ -34,9 +34,14 @@ for _, child in workspace:GetChildren() do
 end
 
 local AGENT = {
-	AgentRadius = 3,
+	-- The generated forest routes are about ten studs wide, but rocks and set
+	-- dressing can narrow the baked navigation channel. The monster itself is
+	-- collisionless, so a slightly smaller planning radius is both accurate and
+	-- much less likely to reject an otherwise clear route.
+	AgentRadius = 2.25,
 	AgentHeight = 7,
 	AgentCanJump = false,
+	WaypointSpacing = 5,
 }
 
 ------------------------------------------------------------------- build the body
@@ -322,18 +327,34 @@ local wpIndex = 1
 local lastCompute = 0
 local currentGoal = Vector3.zero
 local pathObj = PathfindingService:CreatePath(AGENT)
+local directFallbackGoal: Vector3? = nil
 
 local function recompute(goal: Vector3)
 	lastCompute = os.clock()
 	currentGoal = goal
+	directFallbackGoal = nil
 	local ok = pcall(function()
 		pathObj:ComputeAsync(root.Position, goal)
 	end)
 	if ok and pathObj.Status == Enum.PathStatus.Success then
 		waypoints = pathObj:GetWaypoints()
-		wpIndex = 2 -- waypoint 1 is our own position
+		if #waypoints >= 2 then
+			wpIndex = 2 -- waypoint 1 is our own position
+		else
+			-- A successful zero-length path is not a usable route. Keep moving
+			-- toward the requested point instead of idling forever.
+			waypoints = {}
+			wpIndex = 1
+			directFallbackGoal = goal
+		end
 	else
 		waypoints = {}
+		wpIndex = 1
+		-- Pathfinding occasionally has no navmesh ready immediately after the
+		-- procedural map is built. The Blind One is moved by CFrame and has no
+		-- collisions, so direct steering is a safe temporary fallback. A fresh
+		-- path is attempted again on the normal refresh interval.
+		directFallbackGoal = goal
 	end
 end
 
@@ -351,7 +372,9 @@ task.spawn(function()
 			local goal = decide()
 			local maxAge = (state == "hunt") and 0.4 or 0.9
 			local moved = (goal - currentGoal).Magnitude > 6
-			if moved or os.clock() - lastCompute > maxAge or #waypoints == 0 or wpIndex > #waypoints then
+			local missingRoute = #waypoints == 0 and directFallbackGoal == nil
+			local finishedRoute = #waypoints > 0 and wpIndex > #waypoints and directFallbackGoal == nil
+			if moved or os.clock() - lastCompute > maxAge or missingRoute or finishedRoute then
 				recompute(goal)
 			end
 		end
@@ -382,19 +405,30 @@ RunService.Heartbeat:Connect(function(dt)
 		return
 	end
 	local wp = waypoints[wpIndex]
-	if not wp then
+	local targetPosition = if wp then wp.Position else directFallbackGoal
+	if not targetPosition then
 		monster:SetAttribute("VisualMoveSpeed", 0)
 		return
 	end
 
 	currentSpeed += (targetSpeed - currentSpeed) * math.clamp(dt * 4, 0, 1)
 
-	local target = Vector3.new(wp.Position.X, ROOT_Y, wp.Position.Z)
+	local target = Vector3.new(targetPosition.X, ROOT_Y, targetPosition.Z)
 	local toTarget = target - root.Position
 	local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
 
 	if flat.Magnitude < 2.5 then
-		wpIndex += 1
+		if wp then
+			wpIndex += 1
+			if wpIndex > #waypoints then
+				directFallbackGoal = currentGoal
+			end
+		else
+			directFallbackGoal = nil
+			if state == "wander" then
+				wanderGoal = nil
+			end
+		end
 		return
 	end
 
