@@ -159,3 +159,13 @@ death and respawn with no custom death screen or jumpscare.
   permanently stuck.
 - Rojo build and `git diff --check` passed after the fix. The already-open
   Studio session remains connected to the correct PC Rojo server for retesting.
+
+### Photo-mode inspection lighting
+
+- Updated `PhotoMode.client.luau` so freezing the solo AI with `P` also enables
+  local-only neutral inspection lighting: midday, bright white ambient light,
+  no global shadows, no fog, no atmosphere haze, and no post-processing effects.
+- Pressing `P` again restores every captured gameplay lighting, atmosphere, and
+  post-effect value. Other clients and normal gameplay lighting are unaffected.
+- Rojo build and `git diff --check` passed, and the open Studio session received
+  the update through the correct Rojo server.
