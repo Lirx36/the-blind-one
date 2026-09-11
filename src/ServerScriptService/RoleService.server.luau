@@ -6,6 +6,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local JumpPolicy = require(ReplicatedStorage:WaitForChild("JumpPolicy"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"))
 
@@ -55,6 +56,9 @@ end
 local function styleCharacter(player: Player, character: Model, moveToMonsterSpawn: boolean)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local animate = character:FindFirstChild("Animate")
+	if humanoid then
+		JumpPolicy.Apply(humanoid, player:GetAttribute("Role") ~= "BlindOne")
+	end
 	if player:GetAttribute("Role") == "BlindOne" then
 		if animate and animate:IsA("LocalScript") then
 			if animate:GetAttribute(ORIGINAL_ANIMATE_ENABLED) == nil then

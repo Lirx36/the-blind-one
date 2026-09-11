@@ -3,6 +3,8 @@
 *.rbxlx
 *.rbxl.lock
 *.rbxlx.lock
+!backups/city-2026-09-11/TheBlindOne-City.rbxlx
+!backups/maze-2026-09-11/TheBlindOne-Labyrinth-v2.rbxlx
 *.blend1
 __pycache__/
 

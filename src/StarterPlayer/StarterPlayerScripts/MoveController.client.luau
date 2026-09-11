@@ -53,6 +53,18 @@ RunService.PreSimulation:Connect(function(dt)
 	if not hum or hum.Health <= 0 then
 		return
 	end
+	if player:GetAttribute("PhotoModeActive") == true then
+		hum:Move(Vector3.zero)
+		hum.WalkSpeed, hum.Jump = 0, false
+		crouched = false
+		player:SetAttribute("Crouched", false)
+		ClientState.move, ClientState.walkSpeed = "idle", 0
+		if sentState ~= "idle" then
+			sentState = "idle"
+			Remotes.SetMoveState:FireServer("idle")
+		end
+		return
+	end
 	if player:GetAttribute("Role") == "BlindOne" then
 		crouched = false
 		stamina = Config.StaminaMax

@@ -11,6 +11,7 @@ local CollectionService = game:GetService("CollectionService")
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"))
+local MazeLayout = require(ReplicatedStorage:WaitForChild("MazeLayout"))
 
 local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 local catchBindable = ServerStorage:WaitForChild("CatchPlayer") :: BindableEvent
@@ -134,13 +135,28 @@ humanoid.Parent = monster
 -- hidden target skeleton above gives the imported mesh real joints to follow.
 MonsterAppearance.Apply(monster)
 
-Remotes.PhotoMode.OnServerEvent:Connect(function(player: Player)
+local photoOwner: Player? = nil
+local function stopPhotoMode()
+	local owner = photoOwner
+	photoOwner, photoFrozen = nil, false
+	monster:SetAttribute("PhotoFrozen", false)
+	if owner and owner.Parent == Players then Remotes.PhotoMode:FireClient(owner, false) end
+end
+Players.PlayerRemoving:Connect(function(player)
+	if player == photoOwner then stopPhotoMode() end
+end)
+Remotes.PhotoMode.OnServerEvent:Connect(function(player: Player, requested: boolean?)
 	-- Photo mode is a Studio-only solo-testing aid; it can never freeze a live
 	-- game or a player-controlled Blind One.
-	if not RunService:IsStudio() or humanBlindOne() then
+	if player == photoOwner and (requested == false or photoFrozen) then
+		stopPhotoMode()
 		return
 	end
-	photoFrozen = not photoFrozen
+	if not RunService:IsStudio() or humanBlindOne() or requested == false then
+		return
+	end
+	if photoOwner then return end
+	photoOwner, photoFrozen = player, true
 	monster:SetAttribute("PhotoFrozen", photoFrozen)
 	Remotes.PhotoMode:FireClient(player, photoFrozen)
 end)
@@ -328,6 +344,30 @@ local lastCompute = 0
 local currentGoal = Vector3.zero
 local pathObj = PathfindingService:CreatePath(AGENT)
 local directFallbackGoal: Vector3? = nil
+local navigationParams = RaycastParams.new()
+navigationParams.FilterType = Enum.RaycastFilterType.Include
+navigationParams.RespectCanCollide = true
+local function mapCollisionParams(): RaycastParams
+	local map = workspace:FindFirstChild("GeneratedMap")
+	navigationParams.FilterDescendantsInstances = if map then {map} else {}
+	return navigationParams
+end
+
+local function fallbackRoute(goal: Vector3)
+	local map = workspace:FindFirstChild("GeneratedMap")
+	if map and map:GetAttribute("MapKind") == "Maze" then
+		-- Follow the same passage graph that created the walls when navmesh is
+		-- still baking. Never steer through the walls to reach a sound.
+		local route = MazeLayout.Route(root.Position, goal)
+		local fallback: {PathWaypoint} = {}
+		for _, position in route do
+			table.insert(fallback, PathWaypoint.new(position, Enum.PathWaypointAction.Walk))
+		end
+		waypoints, wpIndex, directFallbackGoal = fallback, 1, nil
+	else
+		directFallbackGoal = goal
+	end
+end
 
 local function recompute(goal: Vector3)
 	lastCompute = os.clock()
@@ -345,7 +385,7 @@ local function recompute(goal: Vector3)
 			-- toward the requested point instead of idling forever.
 			waypoints = {}
 			wpIndex = 1
-			directFallbackGoal = goal
+			fallbackRoute(goal)
 		end
 	else
 		waypoints = {}
@@ -354,7 +394,7 @@ local function recompute(goal: Vector3)
 		-- procedural map is built. The Blind One is moved by CFrame and has no
 		-- collisions, so direct steering is a safe temporary fallback. A fresh
 		-- path is attempted again on the normal refresh interval.
-		directFallbackGoal = goal
+		fallbackRoute(goal)
 	end
 end
 
@@ -434,7 +474,14 @@ RunService.Heartbeat:Connect(function(dt)
 
 	local dir = flat.Unit
 	monster:SetAttribute("VisualMoveSpeed", currentSpeed)
-	local newPos = root.Position + dir * math.min(currentSpeed * dt, flat.Magnitude)
+	local step = dir * math.min(currentSpeed * math.min(dt, 0.1), flat.Magnitude)
+	local hit = workspace:Blockcast(CFrame.new(root.Position), Vector3.new(3,5,3), step, mapCollisionParams())
+	if hit then
+		monster:SetAttribute("VisualMoveSpeed", 0)
+		lastCompute = 0
+		return
+	end
+	local newPos = root.Position + step
 	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
 	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))
 	monster:PivotTo(CFrame.new(newPos) * easedRot)
@@ -496,7 +543,8 @@ RunService.Heartbeat:Connect(function()
 			local d = (hrp.Position - sourcePosition).Magnitude
 			local graced = os.clock() - (spawnedAt[player] or 0) < Config.SpawnGrace
 			if d < Config.MonsterCatchDistance and not graced then
-				catchBindable:Fire(player, humanMonster ~= nil)
+				local blocked = workspace:Raycast(sourcePosition, hrp.Position-sourcePosition, mapCollisionParams())
+				if not blocked then catchBindable:Fire(player, humanMonster ~= nil) end
 			end
 			Remotes.Dread:FireClient(player, math.clamp(1 - d / 45, 0, 1))
 		end

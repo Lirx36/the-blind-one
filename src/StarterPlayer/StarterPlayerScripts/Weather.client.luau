@@ -78,9 +78,10 @@ edge("RightVignette", UDim2.fromScale(0.88, 0), UDim2.fromScale(0.12, 1), 180)
 local function refreshStormLens()
 	-- Rain and the renderer stay active in Photo Mode; only the dark lens edges
 	-- disappear so the model can be inspected without any artificial darkness.
-	stormGui.Enabled = player:GetAttribute("PhotoModeActive") ~= true
+	stormGui.Enabled = player:GetAttribute("PhotoModeActive") ~= true and player:GetAttribute("Role") ~= "BlindOne"
 end
 player:GetAttributeChangedSignal("PhotoModeActive"):Connect(refreshStormLens)
+player:GetAttributeChangedSignal("Role"):Connect(refreshStormLens)
 refreshStormLens()
 
 local lightning = Instance.new("ColorCorrectionEffect")
@@ -93,6 +94,11 @@ lightning.Parent = Lighting
 
 local nextLightning = os.clock() + rng:NextNumber(28, 55)
 local initialized = false
+local shelterParams = RaycastParams.new()
+shelterParams.FilterType = Enum.RaycastFilterType.Include
+shelterParams.RespectCanCollide = true
+local sheltered = false
+local nextShelterCheck = 0
 
 RunService.RenderStepped:Connect(function(deltaTime)
 	local camera = workspace.CurrentCamera
@@ -100,6 +106,20 @@ RunService.RenderStepped:Connect(function(deltaTime)
 		return
 	end
 	local cameraPosition = camera.CFrame.Position
+	if os.clock() >= nextShelterCheck then
+		nextShelterCheck = os.clock() + 0.12
+		local map = workspace:FindFirstChild("GeneratedMap")
+		shelterParams.FilterDescendantsInstances = if map then {map} else {}
+		sheltered = workspace:Raycast(cameraPosition, Vector3.new(0,256,0), shelterParams) ~= nil
+	end
+	if player:GetAttribute("Role") == "BlindOne" or sheltered then
+		rainFolder.Parent = nil
+		lightning.Enabled = false
+		initialized = false
+		return
+	end
+	rainFolder.Parent = workspace
+	lightning.Enabled = player:GetAttribute("PhotoModeActive") ~= true
 	if not initialized then
 		for _, streak in streaks do
 			placeStreak(streak, cameraPosition, true)

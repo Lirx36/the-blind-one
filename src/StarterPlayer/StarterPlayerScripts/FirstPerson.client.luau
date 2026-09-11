@@ -221,7 +221,7 @@ RunService:BindToRenderStep("FirstPersonLowerBody", Enum.RenderPriority.Camera.V
 
 	for part in visibleParts do
 		if part.Parent then
-			part.LocalTransparencyModifier = 0
+			part.LocalTransparencyModifier = if player:GetAttribute("PhotoModeActive") == true then 1 else 0
 		end
 	end
 	for part in hiddenFirstPersonParts do
@@ -246,7 +246,7 @@ RunService.PreSimulation:Connect(function()
 		setCrouchPose(0)
 		poseApplied = false
 	end
-	if player:GetAttribute("Role") ~= "BlindOne" then
+	if player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then
 		setFlashlightArmPose()
 		flashlightPoseApplied = true
 	elseif flashlightPoseApplied then

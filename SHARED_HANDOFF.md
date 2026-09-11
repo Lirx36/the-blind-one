@@ -1,6 +1,6 @@
 # Shared Development Handoff - The Blind One
 
-Last updated: 2026-09-10 on the PC
+Last updated: 2026-09-11 on the PC
 Repository: https://github.com/Lirx36/the-blind-one
 Branch: `main`
 
@@ -14,6 +14,35 @@ laptop. Before starting work on either computer:
 5. Commit and push the code and this handoff together.
 
 ## Current state
+
+### 2026-09-11 MCP migration checkpoint
+
+- Replaced the oversized city with a connected 19x19 Hollow Labyrinth. It has
+  84 loops, five landmark rooms, three gate mechanisms, a northern exit, and
+  maze-aware AI navigation/collision safeguards.
+- Added a complete solid roof and ceiling lights across all 361 maze cells.
+  Indoor rain and lightning are suppressed by a roof check.
+- Photo Mode now freezes the solo AI and provides a free-flying camera:
+  `WASD` and mouse to move/look, `Space` or `E` up, `Q` or `Ctrl` down,
+  `Shift` for fast movement, and `P` to enter/return.
+- Survivors cannot jump. The lock is enforced on both the server and client;
+  The Blind One retains its normal movement settings.
+- Refined Blind One hearing visualization: near noisy survivors use a blue
+  silhouette, distant noisy survivors use a small marker, and the global
+  harsh color grade no longer changes the original sense-dot colors.
+- Survivor distance fog uses legacy Lighting fog plus a local rolling mist
+  bank. Photo Mode removes fog/darkness while keeping cinematic effects.
+- Current standalone MCP-ready place:
+  `backups/maze-2026-09-11/TheBlindOne-Labyrinth-v2.rbxlx`.
+- Previous city backup remains at:
+  `backups/city-2026-09-11/TheBlindOne-City.rbxlx`.
+- Runtime checks passed for map construction (2,716 instances), all 361 roof
+  cells, 84-loop graph validation, fog values 12/92, indoor rain suppression,
+  and a forced jump attempt with zero vertical movement.
+
+Do not delete the local repository until this checkpoint is confirmed on
+GitHub. The standalone place can be opened without Rojo, while `src/` retains
+all readable scripts for MCP restoration and future maintenance.
 
 The PC pulled the laptop checkpoint and continued with the first two gameplay
 priorities from `PC_HANDOFF_REPORT.md`.

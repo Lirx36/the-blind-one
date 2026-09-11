@@ -17,10 +17,12 @@ if oldVision then
 end
 local vision = Instance.new("ColorCorrectionEffect")
 vision.Name = "LocalBlindOneVision"
-vision.Brightness = -0.72
-vision.Contrast = 0.48
-vision.Saturation = -1
-vision.TintColor = Color3.fromRGB(82, 101, 108)
+-- Map hiding supplies blindness. Crushing all scene colors also crushed the
+-- cyan surface echoes into dark reddish pixels.
+vision.Brightness = 0
+vision.Contrast = 0
+vision.Saturation = 0
+vision.TintColor = Color3.new(1, 1, 1)
 vision.Enabled = false
 vision.Parent = Lighting
 
@@ -170,6 +172,8 @@ end
 
 local lastRole = ""
 local roleShownAt = 0
+local NEAR_ECHO_ENTER = 42
+local NEAR_ECHO_EXIT = 50 -- hysteresis avoids flickering at the transition
 
 type EchoFigure = {
 	model: Model,
@@ -180,6 +184,7 @@ type EchoFigure = {
 	phase: number,
 	position: Vector3?,
 	direction: Vector3?,
+	near: boolean,
 }
 
 local survivorFigures: { [Player]: EchoFigure } = {}
@@ -196,7 +201,7 @@ local function echoPart(model: Model, name: string, size: Vector3, shape: Enum.P
 	part.Name = name
 	part.Size = size
 	part.Shape = shape or Enum.PartType.Block
-	part.Color = Color3.fromRGB(185, 210, 220)
+	part.Color = Color3.fromRGB(103, 177, 217)
 	part.Material = Enum.Material.Neon
 	part.Transparency = 1
 	part.Anchored = true
@@ -223,8 +228,8 @@ local function newEchoFigure(name: string): EchoFigure
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "LocalSoundSilhouette"
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillColor = Color3.fromRGB(205, 225, 235)
-	highlight.OutlineColor = Color3.fromRGB(240, 250, 255)
+	highlight.FillColor = Color3.fromRGB(68, 143, 193)
+	highlight.OutlineColor = Color3.fromRGB(125, 205, 250)
 	highlight.FillTransparency = 1
 	highlight.OutlineTransparency = 1
 	highlight.Enabled = false
@@ -242,7 +247,7 @@ local function newEchoFigure(name: string): EchoFigure
 	-- Sound is global, but the marker stays deliberately small so distance is
 	-- readable instead of turning every survivor into a giant HUD target.
 	billboard.MaxDistance = 100000
-	billboard.Size = UDim2.fromOffset(40, 64)
+	billboard.Size = UDim2.fromOffset(28, 44)
 	billboard.Enabled = false
 	billboard.Parent = parts.Torso
 
@@ -291,6 +296,7 @@ local function newEchoFigure(name: string): EchoFigure
 		strokes = strokes,
 		parts = parts,
 		phase = 0,
+		near = false,
 	}
 end
 
@@ -322,13 +328,15 @@ local function poseEcho(
 	speed: number,
 	strength: number,
 	dt: number,
-	forceMotion: boolean
+	forceMotion: boolean,
+	distance: number
 )
+	figure.near = if figure.near then distance < NEAR_ECHO_EXIT else distance <= NEAR_ECHO_ENTER
 	for _, part in figure.parts do
 		-- Highlight stops rendering reliably on almost-fully-transparent parts.
 		-- A dim Neon body guarantees a readable anonymous echo in the darkness;
 		-- the real survivor avatar remains locally hidden.
-		part.Transparency = 0.82
+		part.Transparency = if figure.near then 0.82 else 1
 	end
 	local flatDirection = Vector3.new(direction.X, 0, direction.Z)
 	if flatDirection.Magnitude < 0.01 then
@@ -349,10 +357,10 @@ local function poseEcho(
 	figure.parts.RightArm.CFrame = base * CFrame.new(0.91, 0.02 + bob, 0) * CFrame.Angles(-swing, 0, 0)
 	figure.parts.LeftLeg.CFrame = base * CFrame.new(-0.37, -1.67 + bob, 0) * CFrame.Angles(-swing, 0, 0)
 	figure.parts.RightLeg.CFrame = base * CFrame.new(0.37, -1.67 + bob, 0) * CFrame.Angles(swing, 0, 0)
-	figure.highlight.Enabled = strength > 0.02
+	figure.highlight.Enabled = figure.near and strength > 0.02
 	figure.highlight.FillTransparency = 0.93 - strength * 0.2
 	figure.highlight.OutlineTransparency = 0.62 - strength * 0.58
-	figure.billboard.Enabled = strength > 0.02
+	figure.billboard.Enabled = not figure.near and strength > 0.02
 	local strokeTransparency = math.clamp(0.76 - strength * 0.72, 0.04, 0.72)
 	for _, stroke in figure.strokes do
 		stroke.Transparency = strokeTransparency
@@ -360,6 +368,7 @@ local function poseEcho(
 end
 
 local function hideEcho(figure: EchoFigure)
+	figure.near = false
 	figure.highlight.Enabled = false
 	figure.billboard.Enabled = false
 	for _, part in figure.parts do
@@ -442,6 +451,10 @@ end
 -- generated world locally while keeping its collision/query geometry intact;
 -- the close-range surface echoes can still raycast against invisible walls.
 local hiddenMapParts: { [BasePart]: number } = {}
+local hiddenMapEffects: { [Instance]: boolean } = {}
+local hiddenMapTextures: { [Decal]: number } = {}
+local savedVisionFog: {color: Color3, start: number, finish: number}? = nil
+local pausedGrades: { [PostEffect]: boolean } = {}
 local hiddenMap: Instance? = nil
 local mapDescendantConnection: RBXScriptConnection? = nil
 
@@ -451,6 +464,14 @@ local function hideMapDescendant(descendant: Instance)
 			hiddenMapParts[descendant] = descendant.LocalTransparencyModifier
 		end
 		descendant.LocalTransparencyModifier = 1
+	elseif descendant:IsA("SurfaceGui") or descendant:IsA("BillboardGui")
+		or descendant:IsA("Light") or descendant:IsA("ParticleEmitter")
+		or descendant:IsA("Beam") or descendant:IsA("Highlight") then
+		hiddenMapEffects[descendant] = (descendant :: any).Enabled
+		(descendant :: any).Enabled = false
+	elseif descendant:IsA("Decal") then
+		hiddenMapTextures[descendant] = descendant.Transparency
+		descendant.Transparency = 1
 	end
 end
 
@@ -466,14 +487,41 @@ local function restoreHiddenMap()
 		hiddenMapParts[mapPart] = nil
 	end
 	hiddenMap = nil
+	for effect, enabled in hiddenMapEffects do
+		if effect.Parent then (effect :: any).Enabled = enabled end
+		hiddenMapEffects[effect] = nil
+	end
+	for texture, transparency in hiddenMapTextures do
+		if texture.Parent then texture.Transparency = transparency end
+		hiddenMapTextures[texture] = nil
+	end
 end
 
 local function setMapBlindness(enabled: boolean)
 	if not enabled then
+		if savedVisionFog then
+			Lighting.FogColor, Lighting.FogStart, Lighting.FogEnd = savedVisionFog.color, savedVisionFog.start, savedVisionFog.finish
+			savedVisionFog = nil
+			for effect, wasEnabled in pausedGrades do
+				if effect.Parent then effect.Enabled = wasEnabled end
+				pausedGrades[effect] = nil
+			end
+		end
 		if hiddenMap then
 			restoreHiddenMap()
 		end
 		return
+	end
+	if not savedVisionFog then
+		savedVisionFog = {color = Lighting.FogColor, start = Lighting.FogStart, finish = Lighting.FogEnd}
+	end
+	-- The sky and hidden map stay black; the blue echoes retain their own color.
+	Lighting.FogColor, Lighting.FogStart, Lighting.FogEnd = Color3.new(), 100000, 100001
+	for _, effect in Lighting:GetChildren() do
+		if effect:IsA("PostEffect") and effect ~= vision then
+			if pausedGrades[effect] == nil then pausedGrades[effect] = effect.Enabled end
+			effect.Enabled = false
+		end
 	end
 	local currentMap = Workspace:FindFirstChild("GeneratedMap")
 	if currentMap == hiddenMap then
@@ -573,7 +621,8 @@ RunService.RenderStepped:Connect(function(dt)
 		if isBlindOne and root and shownStrength > 0.02 then
 			local velocity = root.AssemblyLinearVelocity
 			local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-			poseEcho(figure, root.Position, root.CFrame.LookVector, speed, shownStrength, dt, false)
+			poseEcho(figure, root.Position, root.CFrame.LookVector, speed, shownStrength, dt, false,
+				if ownRoot then (root.Position-ownRoot.Position).Magnitude else math.huge)
 		else
 			hideEcho(figure)
 		end
@@ -608,12 +657,7 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 		local strength = 0
 		if isBlindOne and ownRoot then
-			local distance = (tagged.Position - ownRoot.Position).Magnitude
-			local hearingRange = Config.ThrowImpactNoise * Config.NoiseCarry * 1.55
-			if distance <= hearingRange then
-				local fade = math.clamp((untilValue - serverNow) / 1.2, 0, 1)
-				strength = (0.55 + 0.45 * (1 - distance / hearingRange)) * fade
-			end
+			strength = math.clamp((untilValue - serverNow) / 1.2, 0, 1)
 		end
 		if strength > 0.02 then
 			local velocity = tagged.AssemblyLinearVelocity
@@ -654,7 +698,8 @@ RunService.RenderStepped:Connect(function(dt)
 				if moving then fakeRunSpeed else math.min(flatVelocity.Magnitude, 3),
 				strength,
 				dt,
-				moving
+				moving,
+				if ownRoot then (currentPosition-ownRoot.Position).Magnitude else math.huge
 			)
 		else
 			hideEcho(figure)

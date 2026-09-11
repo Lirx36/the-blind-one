@@ -128,7 +128,7 @@ end)
 applyLightState()
 
 RunService:BindToRenderStep("HeldFlashlightView", Enum.RenderPriority.Camera.Value + 2, function()
-	if player:GetAttribute("Role") == "BlindOne" then
+	if player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true then
 		if flashlight.Parent then flashlight.Parent = nil end
 		return
 	elseif not flashlight.Parent then

@@ -79,7 +79,7 @@ local function lookedAtRock(): BasePart?
 end
 
 RunService.RenderStepped:Connect(function()
-	local target = if player:GetAttribute("Role") ~= "BlindOne" then lookedAtRock() else nil
+	local target = if player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then lookedAtRock() else nil
 	pickupOutline.Adornee = target
 	pickupOutline.Enabled = target ~= nil
 	pickupBillboard.Adornee = target
@@ -87,7 +87,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe or player:GetAttribute("Role") == "BlindOne" then
+	if gpe or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
