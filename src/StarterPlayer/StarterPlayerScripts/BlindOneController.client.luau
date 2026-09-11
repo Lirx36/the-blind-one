@@ -17,10 +17,10 @@ if oldVision then
 end
 local vision = Instance.new("ColorCorrectionEffect")
 vision.Name = "LocalBlindOneVision"
-vision.Brightness = 0.06
-vision.Contrast = 0.2
-vision.Saturation = -0.78
-vision.TintColor = Color3.fromRGB(165, 185, 195)
+vision.Brightness = -0.72
+vision.Contrast = 0.48
+vision.Saturation = -1
+vision.TintColor = Color3.fromRGB(82, 101, 108)
 vision.Enabled = false
 vision.Parent = Lighting
 
@@ -239,8 +239,10 @@ local function newEchoFigure(name: string): EchoFigure
 	billboard.Adornee = parts.Torso
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
-	billboard.MaxDistance = 500
-	billboard.Size = UDim2.fromOffset(68, 108)
+	-- Sound is global, but the marker stays deliberately small so distance is
+	-- readable instead of turning every survivor into a giant HUD target.
+	billboard.MaxDistance = 100000
+	billboard.Size = UDim2.fromOffset(40, 64)
 	billboard.Enabled = false
 	billboard.Parent = parts.Torso
 
@@ -269,7 +271,7 @@ local function newEchoFigure(name: string): EchoFigure
 		stroke.Name = "SoundStroke"
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Color = Color3.fromRGB(225, 244, 255)
-		stroke.Thickness = 2.2
+		stroke.Thickness = 1.35
 		stroke.Transparency = 1
 		stroke.Parent = piece
 		table.insert(strokes, stroke)
@@ -436,6 +438,58 @@ local function hideActualCharacter(character: Model, hidden: boolean)
 	end
 end
 
+-- Blindness must not depend on how bright the map happens to be. Hide the
+-- generated world locally while keeping its collision/query geometry intact;
+-- the close-range surface echoes can still raycast against invisible walls.
+local hiddenMapParts: { [BasePart]: number } = {}
+local hiddenMap: Instance? = nil
+local mapDescendantConnection: RBXScriptConnection? = nil
+
+local function hideMapDescendant(descendant: Instance)
+	if descendant:IsA("BasePart") then
+		if hiddenMapParts[descendant] == nil then
+			hiddenMapParts[descendant] = descendant.LocalTransparencyModifier
+		end
+		descendant.LocalTransparencyModifier = 1
+	end
+end
+
+local function restoreHiddenMap()
+	if mapDescendantConnection then
+		mapDescendantConnection:Disconnect()
+		mapDescendantConnection = nil
+	end
+	for mapPart, original in hiddenMapParts do
+		if mapPart.Parent then
+			mapPart.LocalTransparencyModifier = original
+		end
+		hiddenMapParts[mapPart] = nil
+	end
+	hiddenMap = nil
+end
+
+local function setMapBlindness(enabled: boolean)
+	if not enabled then
+		if hiddenMap then
+			restoreHiddenMap()
+		end
+		return
+	end
+	local currentMap = Workspace:FindFirstChild("GeneratedMap")
+	if currentMap == hiddenMap then
+		return
+	end
+	restoreHiddenMap()
+	if not currentMap then
+		return
+	end
+	hiddenMap = currentMap
+	for _, descendant in currentMap:GetDescendants() do
+		hideMapDescendant(descendant)
+	end
+	mapDescendantConnection = currentMap.DescendantAdded:Connect(hideMapDescendant)
+end
+
 Players.PlayerRemoving:Connect(function(target)
 	local figure = survivorFigures[target]
 	if figure then
@@ -465,6 +519,7 @@ RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 	vision.Enabled = isBlindOne
+	setMapBlindness(isBlindOne)
 	gui.Enabled = role ~= "" and now - roleShownAt < 8
 	local ownCharacter = player.Character
 	local ownRoot = ownCharacter and ownCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -506,14 +561,11 @@ RunService.RenderStepped:Connect(function(dt)
 		local strength = 0
 		if isBlindOne and ownRoot and root and humanoid and humanoid.Health > 0
 			and target:GetAttribute("Role") ~= "BlindOne" and noise >= Config.MonsterHearingFloor then
-			local distance = (root.Position - ownRoot.Position).Magnitude
-			-- Human-controlled monsters need a readable signal across these large
-			-- rooms. Walking carries at least 90 studs; sprinting carries much farther.
-			local hearingRange = math.max(90, noise * Config.NoiseCarry * 1.55)
-			audible = distance <= hearingRange
-			local proximity = math.clamp(1 - distance / hearingRange, 0, 1)
+			-- The Blind One hears qualifying survivor noise anywhere on the map.
+			-- Distance never suppresses the echo; silence is the only way to vanish.
+			audible = true
 			local loudness = math.clamp(noise / Config.NoiseWalk, 0.45, 1)
-			strength = math.clamp((0.35 + proximity * 0.65) * loudness, 0, 1)
+			strength = math.clamp(loudness, 0, 1)
 		end
 		-- No after-image: once the survivor's noise falls below the hearing floor,
 		-- the outline vanishes with the meter instead of leaking their position.

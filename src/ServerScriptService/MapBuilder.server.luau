@@ -5,7 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 
-local MAP_VERSION = "HollowSettlement_3"
+local MAP_VERSION = "HollowSettlement_4"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
 if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then
 	return
@@ -104,7 +104,9 @@ grade.Parent = Lighting
 local atmosphere = Instance.new("Atmosphere")
 atmosphere.Name = "TheHollowAtmosphere"
 atmosphere.Color, atmosphere.Decay = Color3.fromRGB(134, 142, 145), Color3.fromRGB(53, 61, 65)
-atmosphere.Density, atmosphere.Haze, atmosphere.Glare, atmosphere.Offset = 0.35, 2.55, 0, -0.12
+-- Keep the distance grade restrained; visible low fog is supplied by the
+-- survivor-only rolling fog banks instead of flattening the whole world grey.
+atmosphere.Density, atmosphere.Haze, atmosphere.Glare, atmosphere.Offset = 0.22, 1.35, 0, -0.16
 atmosphere.Parent = Lighting
 
 local bloom = Instance.new("BloomEffect")

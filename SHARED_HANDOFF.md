@@ -345,3 +345,30 @@ death and respawn with no custom death screen or jumpscare.
   24-158 studs, brightened it to a cold grey, and increased Atmosphere density
   and haze. Nearby flashlight space stays readable while streets and buildings
   now dissolve into a visible grey fog wall like the reference.
+
+## Blindness, global hearing, and rolling fog (2026-09-11)
+
+- Checked both handoff reports, fetched GitHub with no incoming changes, and
+  confirmed the correct Rojo server remained connected on port 34872 before
+  editing.
+- Fixed the player-controlled Blind One being able to see the town normally.
+  The generated map is now hidden locally for that role while its collision and
+  raycast geometry remain intact, so only the existing close-range surface
+  echoes and noise silhouettes reveal useful information. The old local color
+  filter, which had actually brightened the world, is now a severe dark
+  monochrome grade.
+- Removed the distance gate from survivor sound sensing. Any living survivor
+  whose noise reaches `MonsterHearingFloor` now creates an echo anywhere in the
+  map; silence is the only way to disappear. The through-wall BillboardGui cap
+  was raised to 100,000 studs so rendering cannot reintroduce a practical range.
+- Reduced the survivor echo icon from 68x108 to 40x64 pixels and reduced its
+  outline thickness, keeping faraway signals informative rather than huge.
+- Added `Fog.client.luau`: twelve pooled, camera-relative ground fog banks use a
+  built-in Roblox smoke texture to create actual drifting street-level fog for
+  survivors instead of relying on a uniform grey Atmosphere wash. Fog clears
+  immediately for Blind One POV and Photo Mode.
+- Bumped the generated map to `HollowSettlement_4` and reduced the broad
+  Atmosphere density/haze so the new rolling banks provide depth without making
+  every building a flat grey silhouette.
+- Rojo build and `git diff --check` passed, producing
+  `build/the-blind-one-hearing-fog-test.rbxlx`.
