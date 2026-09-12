@@ -2,7 +2,7 @@
 -- All tuning for The Blind One. Change numbers here; no other edits needed.
 return {
 	-- ---- player movement ----
-	WalkSpeed = 11,
+	WalkSpeed = 13,
 	CrouchSpeed = 6,
 	SprintSpeed = 20,
 	StaminaMax = 4.5, -- seconds of sprint
@@ -24,8 +24,8 @@ return {
 	BumpNoise = 32,
 
 	-- ---- monster: The Blind One ----
-	MonsterWanderSpeed = 8,
-	MonsterInvestigateSpeed = 13,
+	MonsterWanderSpeed = 9,
+	MonsterInvestigateSpeed = 14,
 	MonsterHuntSpeed = 19, -- just under SprintSpeed: sprinting CAN break line, but it screams your position
 	MonsterCatchDistance = 5.5,
 	MonsterHearingFloor = 6, -- effective loudness below this is not registered
@@ -35,7 +35,7 @@ return {
 	MonsterHuntNoise = 42, -- heard loudness at short range that escalates INVESTIGATE -> HUNT
 	MonsterHuntRange = 22, -- ...within this distance
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
-	PlayerBlindOneSpeed = 18,
+	PlayerBlindOneSpeed = 19,
 
 	-- ---- round ----
 	StudioSafeMode = true, -- in Studio the monster can chase, but cannot kill players

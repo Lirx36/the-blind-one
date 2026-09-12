@@ -13,7 +13,17 @@ end
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local player = Players.LocalPlayer
-local controls = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+local controls: any = nil
+local function resolveControls()
+	if controls then return controls end
+	local playerModule = player:WaitForChild("PlayerScripts"):FindFirstChild("PlayerModule")
+	if not playerModule then return nil end
+	local ok, module = pcall(require, playerModule)
+	if ok and module and module.GetControls then
+		controls = module:GetControls()
+	end
+	return controls
+end
 local flightState: any = nil
 local windowFocused = true
 UserInputService.WindowFocused:Connect(function() windowFocused = true end)
@@ -30,7 +40,8 @@ local function startFlight()
 		prompts = ProximityPromptService.Enabled,
 		position = camera.CFrame.Position, pitch = pitch, yaw = yaw,
 	}
-	controls:Disable()
+	local activeControls = resolveControls()
+	if activeControls then activeControls:Disable() end
 	ProximityPromptService.Enabled = false
 	camera.CameraType = Enum.CameraType.Scriptable
 	RunService:BindToRenderStep("PhotoModeFlight", Enum.RenderPriority.Camera.Value + 3, function(dt)
@@ -76,7 +87,8 @@ local function stopFlight()
 	end
 	UserInputService.MouseBehavior, UserInputService.MouseIconEnabled = state.mouseBehavior, state.mouseIcon
 	ProximityPromptService.Enabled = state.prompts
-	controls:Enable()
+	local activeControls = resolveControls()
+	if activeControls then activeControls:Enable() end
 end
 
 type AtmosphereState = {
@@ -199,16 +211,19 @@ label.TextWrapped = true
 label.Text = "Press P for Photo Mode / free flight"
 label.Parent = gui
 
-player:GetAttributeChangedSignal("Role"):Connect(function()
-	gui.Enabled = player:GetAttribute("Role") ~= "BlindOne"
-	if player:GetAttribute("Role") == "BlindOne" and savedLighting then
+local function refreshAvailability()
+	local available = player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne"
+	gui.Enabled = available
+	if not available and savedLighting then
 		player:SetAttribute("PhotoModeActive", false)
 		stopFlight()
 		restoreGameplayLighting()
 		Remotes.PhotoMode:FireServer(false)
 	end
-end)
-gui.Enabled = player:GetAttribute("Role") ~= "BlindOne"
+end
+player:GetAttributeChangedSignal("Role"):Connect(refreshAvailability)
+player:GetAttributeChangedSignal("InMatch"):Connect(refreshAvailability)
+refreshAvailability()
 
 UserInputService.InputBegan:Connect(function(input)
 	if UserInputService:GetFocusedTextBox() then
@@ -216,7 +231,7 @@ UserInputService.InputBegan:Connect(function(input)
 	end
 	local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-	if input.KeyCode == Enum.KeyCode.P and not shiftHeld and player:GetAttribute("Role") ~= "BlindOne" then
+	if input.KeyCode == Enum.KeyCode.P and not shiftHeld and player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne" then
 		Remotes.PhotoMode:FireServer()
 	end
 end)

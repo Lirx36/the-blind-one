@@ -7,6 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+
+local LOBBY_PLACE_ID = 80010173580795
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
@@ -284,6 +287,13 @@ local function connectEscapeZone(zone: Instance)
 		player:SetAttribute("Escaped", true)
 		setObjective(player, "YOU ESCAPED THE HOLLOW.")
 		broadcastSurvivorObjective()
+		if not RunService:IsStudio() then
+			task.delay(5, function()
+				if player.Parent == Players then
+					pcall(function() TeleportService:TeleportAsync(LOBBY_PLACE_ID, { player }) end)
+				end
+			end)
+		end
 	end)
 end
 

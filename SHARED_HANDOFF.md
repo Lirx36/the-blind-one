@@ -1,6 +1,6 @@
 # Shared Development Handoff - The Blind One
 
-Last updated: 2026-09-11 on the PC
+Last updated: 2026-09-12 on the PC
 Repository: https://github.com/Lirx36/the-blind-one
 Branch: `main`
 
@@ -14,6 +14,27 @@ laptop. Before starting work on either computer:
 5. Commit and push the code and this handoff together.
 
 ## Current state
+
+### 2026-09-12 fresh-place MCP restoration
+
+- Restored the complete Hollow Labyrinth directly into the single connected
+  Roblox Studio place `The Blind One` (`placeId 121524238363010`) using Studio
+  MCP. No additional Roblox places/worlds were created and Rojo was not used.
+- Injected all 24 source scripts: five shared modules, seven server scripts,
+  and twelve client scripts. Removed only the fresh template's Baseplate and
+  SpawnLocation; the runtime map builder owns the playable environment.
+- Fixed an ambiguous Luau statement in `BlindOneController.client.luau` that
+  prevented the Blind One client controller from compiling.
+- Made Photo Mode tolerate experiences where Roblox's default `PlayerModule`
+  is unavailable instead of waiting forever. Free flight now enters, moves,
+  and exits correctly in the fresh place.
+- Nerfed the survivor flashlight to stop washing out nearby walls: focused
+  beam brightness/range/angle are now 3.2/66/42, spill is 0.7/42/76, and the
+  near fill is 0.1/5.
+- MCP playtest passed with a clean console. Verified map version
+  `HollowLabyrinth_2`, 2,716 generated descendants, 317 wall parts, 361
+  navigation cells, 81 roof sections, 84 loops, three mechanisms, a valid
+  spawn, a live monster humanoid, and survivor jumping disabled.
 
 ### 2026-09-11 MCP migration checkpoint
 

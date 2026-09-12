@@ -104,7 +104,9 @@ local function setRole(player: Player, role: string)
 		styleCharacter(player, character, changed and role == "BlindOne")
 	end
 	if changed then
-		if role == "BlindOne" then
+		if role == "" then
+			return
+		elseif role == "BlindOne" then
 			Remotes.Objective:FireClient(player, "YOU ARE THE BLIND ONE — follow sound and catch every survivor.")
 		else
 			local map = workspace:FindFirstChild("GeneratedMap")
@@ -119,8 +121,17 @@ local function setRole(player: Player, role: string)
 end
 
 local function refreshRoles()
-	local players = Players:GetPlayers()
-	if not Config.PlayerBlindOneEnabled or #players < 2 then
+	local players = {}
+	for _, player in Players:GetPlayers() do
+		if player:GetAttribute("InMatch") == true then
+			table.insert(players, player)
+		else
+			setRole(player, "")
+		end
+	end
+	if #players == 0 then return end
+	local playerControlled = workspace:GetAttribute("BlindOneMode") == "Player"
+	if not Config.PlayerBlindOneEnabled or not playerControlled or #players < 2 then
 		for _, player in players do
 			setRole(player, "Survivor")
 		end
@@ -144,8 +155,9 @@ end
 
 local function setupPlayer(player: Player)
 	if player:GetAttribute("Role") == nil then
-		player:SetAttribute("Role", "Survivor")
+		player:SetAttribute("Role", "")
 	end
+	player:GetAttributeChangedSignal("InMatch"):Connect(refreshRoles)
 	player.CharacterAdded:Connect(function(character)
 		task.wait(0.1)
 		styleCharacter(player, character, player:GetAttribute("Role") == "BlindOne")
@@ -171,3 +183,4 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 task.defer(refreshRoles)
+workspace:GetAttributeChangedSignal("BlindOneMode"):Connect(refreshRoles)

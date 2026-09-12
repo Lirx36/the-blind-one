@@ -1,0 +1,23 @@
+{
+  "name": "The Blind One Lobby",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Remotes": {
+        "$path": "src/ReplicatedStorage/Remotes.luau"
+      }
+    },
+    "ServerScriptService": {
+      "LobbyService": {
+        "$path": "lobby-src/ServerScriptService/LobbyService.server.luau"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Lobby": {
+          "$path": "lobby-src/StarterPlayer/StarterPlayerScripts/Lobby.client.luau"
+        }
+      }
+    }
+  }
+}

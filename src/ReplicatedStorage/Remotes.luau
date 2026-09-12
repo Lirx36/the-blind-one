@@ -13,6 +13,8 @@ local NAMES = {
 	"HeldCount", -- server -> client: how many rocks you hold
 	"Objective", -- server -> client: objective text
 	"PhotoMode", -- Studio testing: client toggles the solo AI freeze
+	"LobbyAction", -- client -> server: enter lobby, set capacity, or start
+	"LobbyState", -- server -> client: current lobby roster and status
 }
 
 local folder: Folder

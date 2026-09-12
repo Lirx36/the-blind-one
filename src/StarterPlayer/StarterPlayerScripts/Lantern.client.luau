@@ -68,9 +68,9 @@ local hotspot = Instance.new("SpotLight")
 hotspot.Name = "FocusedHotspot"
 hotspot.Face = Enum.NormalId.Front
 hotspot.Color = Color3.fromRGB(222, 230, 231)
-hotspot.Brightness = 6.4
-hotspot.Range = 82
-hotspot.Angle = 48
+hotspot.Brightness = 1.9
+hotspot.Range = 44
+hotspot.Angle = 34
 hotspot.Shadows = true
 hotspot.Parent = beamEmitter
 
@@ -78,17 +78,17 @@ local spill = Instance.new("SpotLight")
 spill.Name = "SoftSpill"
 spill.Face = Enum.NormalId.Front
 spill.Color = Color3.fromRGB(188, 202, 205)
-spill.Brightness = 1.8
-spill.Range = 52
-spill.Angle = 92
+spill.Brightness = 0.28
+spill.Range = 25
+spill.Angle = 54
 spill.Shadows = false
 spill.Parent = beamEmitter
 
 local nearFill = Instance.new("PointLight")
 nearFill.Name = "NearFill"
 nearFill.Color = Color3.fromRGB(184, 197, 200)
-nearFill.Brightness = 0.26
-nearFill.Range = 7
+nearFill.Brightness = 0.04
+nearFill.Range = 3.5
 nearFill.Shadows = false
 nearFill.Parent = beamEmitter
 
@@ -128,7 +128,7 @@ end)
 applyLightState()
 
 RunService:BindToRenderStep("HeldFlashlightView", Enum.RenderPriority.Camera.Value + 2, function()
-	if player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true then
+	if player:GetAttribute("InMatch") ~= true or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true then
 		if flashlight.Parent then flashlight.Parent = nil end
 		return
 	elseif not flashlight.Parent then

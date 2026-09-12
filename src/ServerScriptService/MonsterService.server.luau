@@ -19,7 +19,7 @@ local photoFrozen = false
 
 local function humanBlindOne(): Player?
 	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("Role") == "BlindOne" then
+		if player:GetAttribute("InMatch") ~= true or player:GetAttribute("Role") == "BlindOne" then
 			return player
 		end
 	end
@@ -532,7 +532,7 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	for _, player in Players:GetPlayers() do
-		if player == humanMonster or player:GetAttribute("Role") == "BlindOne" then
+		if player:GetAttribute("InMatch") ~= true or player == humanMonster or player:GetAttribute("Role") == "BlindOne" then
 			continue
 		end
 		local char = player.Character

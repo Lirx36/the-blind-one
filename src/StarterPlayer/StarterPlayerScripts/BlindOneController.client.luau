@@ -7,6 +7,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local player = Players.LocalPlayer
@@ -171,7 +172,56 @@ local function updateGeometrySense(camera: Camera, ownCharacter: Model, now: num
 end
 
 local lastRole = ""
-local roleShownAt = 0
+local roleSequence = 0
+local ROLE_HIDDEN_POSITION = UDim2.new(0.5, 0, 0, -62)
+local ROLE_SHOWN_POSITION = UDim2.new(0.5, 0, 0, 74)
+local ROLE_TWEEN = TweenInfo.new(0.65, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+local function playRoleReveal(isBlindOne: boolean)
+	roleSequence += 1
+	local sequence = roleSequence
+	player:SetAttribute("RoleIntroComplete", false)
+	gui.Enabled = true
+	title.Position = ROLE_HIDDEN_POSITION
+	title.TextTransparency = 1
+	title.TextStrokeTransparency = 1
+	hint.Visible = isBlindOne
+	hint.TextTransparency = 1
+	hint.TextStrokeTransparency = 1
+
+	local titleIn = TweenService:Create(title, ROLE_TWEEN, {
+		Position = ROLE_SHOWN_POSITION,
+		TextTransparency = 0,
+		TextStrokeTransparency = 0.35,
+	})
+	titleIn:Play()
+	if isBlindOne then
+		TweenService:Create(hint, ROLE_TWEEN, {
+			TextTransparency = 0,
+			TextStrokeTransparency = 0.55,
+		}):Play()
+	end
+	titleIn.Completed:Wait()
+	task.wait(2.15)
+	if sequence ~= roleSequence then return end
+
+	local titleOut = TweenService:Create(title, ROLE_TWEEN, {
+		Position = ROLE_HIDDEN_POSITION,
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
+	})
+	titleOut:Play()
+	if isBlindOne then
+		TweenService:Create(hint, ROLE_TWEEN, {
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+		}):Play()
+	end
+	titleOut.Completed:Wait()
+	if sequence ~= roleSequence then return end
+	gui.Enabled = false
+	player:SetAttribute("RoleIntroComplete", true)
+end
 local NEAR_ECHO_ENTER = 42
 local NEAR_ECHO_EXIT = 50 -- hysteresis avoids flickering at the transition
 
@@ -468,7 +518,7 @@ local function hideMapDescendant(descendant: Instance)
 		or descendant:IsA("Light") or descendant:IsA("ParticleEmitter")
 		or descendant:IsA("Beam") or descendant:IsA("Highlight") then
 		hiddenMapEffects[descendant] = (descendant :: any).Enabled
-		(descendant :: any).Enabled = false
+		;(descendant :: any).Enabled = false
 	elseif descendant:IsA("Decal") then
 		hiddenMapTextures[descendant] = descendant.Transparency
 		descendant.Transparency = 1
@@ -553,7 +603,6 @@ RunService.RenderStepped:Connect(function(dt)
 	local now = os.clock()
 	if role ~= "" and role ~= lastRole then
 		lastRole = role
-		roleShownAt = now
 		if isBlindOne then
 			title.Text = "YOU ARE THE BLIND ONE"
 			title.TextColor3 = Color3.fromRGB(210, 225, 232)
@@ -565,10 +614,10 @@ RunService.RenderStepped:Connect(function(dt)
 			hint.Text = "Hold Ctrl to crouch • Shift to sprint • E picks up rocks • Click throws them"
 			hint.TextColor3 = Color3.fromRGB(170, 195, 165)
 		end
+		task.spawn(playRoleReveal, isBlindOne)
 	end
 	vision.Enabled = isBlindOne
 	setMapBlindness(isBlindOne)
-	gui.Enabled = role ~= "" and now - roleShownAt < 8
 	local ownCharacter = player.Character
 	local ownRoot = ownCharacter and ownCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
 	-- The monster skin is deliberately huge and textured, but those same meshes

@@ -53,12 +53,13 @@ vignette.Parent = gui
 local objectiveBanner = Instance.new("CanvasGroup")
 objectiveBanner.Name = "ObjectiveBanner"
 objectiveBanner.AnchorPoint = Vector2.new(0.5, 0)
-objectiveBanner.Position = UDim2.new(0.5, 0, 0, 16)
+objectiveBanner.Position = UDim2.new(0.5, 0, 0, -112)
 objectiveBanner.Size = UDim2.fromOffset(560, 104)
 objectiveBanner.BackgroundColor3 = Color3.fromRGB(6, 9, 11)
 objectiveBanner.BackgroundTransparency = 0.72
 objectiveBanner.BorderSizePixel = 0
-objectiveBanner.GroupTransparency = 0
+objectiveBanner.GroupTransparency = 1
+objectiveBanner.Visible = false
 objectiveBanner.Parent = gui
 
 local bannerGradient = Instance.new("UIGradient")
@@ -394,24 +395,37 @@ Remotes.Dread.OnClientEvent:Connect(function(v: number)
 	dread = v
 end)
 
+local objectiveReceived = false
+local objectiveShown = false
+local OBJECTIVE_HIDDEN_POSITION = UDim2.new(0.5, 0, 0, -112)
+local OBJECTIVE_SHOWN_POSITION = UDim2.new(0.5, 0, 0, 16)
+local OBJECTIVE_TWEEN = TweenInfo.new(0.65, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+local function revealObjective()
+	if objectiveShown or not objectiveReceived then return end
+	if player:GetAttribute("Role") == "BlindOne" then return end
+	if player:GetAttribute("RoleIntroComplete") ~= true then return end
+	objectiveShown = true
+	objectiveBanner.Visible = true
+	objectiveBanner.Position = OBJECTIVE_HIDDEN_POSITION
+	objectiveBanner.GroupTransparency = 1
+	objectiveRule.Size = UDim2.fromOffset(16, 2)
+	TweenService:Create(objectiveBanner, OBJECTIVE_TWEEN, {
+		Position = OBJECTIVE_SHOWN_POSITION,
+		GroupTransparency = 0,
+	}):Play()
+	TweenService:Create(objectiveRule, OBJECTIVE_TWEEN, {
+		Size = UDim2.fromOffset(390, 2),
+	}):Play()
+end
+
 Remotes.Objective.OnClientEvent:Connect(function(text: string)
 	objective.Text = text
-	if player:GetAttribute("Role") ~= "BlindOne" then
-		objectiveBanner.Position = UDim2.new(0.5, 0, 0, 5)
-		objectiveBanner.GroupTransparency = 1
-		TweenService:Create(
-			objectiveBanner,
-			TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-			{ Position = UDim2.new(0.5, 0, 0, 16), GroupTransparency = 0 }
-		):Play()
-		objectiveRule.Size = UDim2.fromOffset(16, 2)
-		TweenService:Create(
-			objectiveRule,
-			TweenInfo.new(0.75, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-			{ Size = UDim2.fromOffset(390, 2) }
-		):Play()
-	end
+	objectiveReceived = true
+	revealObjective()
 end)
+
+player:GetAttributeChangedSignal("RoleIntroComplete"):Connect(revealObjective)
 
 Remotes.HeldCount.OnClientEvent:Connect(function(n: number)
 	setRockCount(n)
@@ -419,11 +433,13 @@ end)
 
 RunService.RenderStepped:Connect(function()
 	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
+	local isSurvivor = player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "Survivor"
 	local isPhotoMode = player:GetAttribute("PhotoModeActive") == true
-	objectiveBanner.Visible = not isBlindOne
-	panel.Visible = not isBlindOne
-	controlsPanel.Visible = not isBlindOne
-	rockSlot.Visible = not isBlindOne
+	objectiveBanner.Visible = isSurvivor and objectiveShown
+	progressPanel.Visible = isSurvivor and objectiveShown
+	panel.Visible = isSurvivor
+	controlsPanel.Visible = isSurvivor
+	rockSlot.Visible = isSurvivor
 	local heldValue = player:GetAttribute("HeldBalls")
 	if typeof(heldValue) == "number" then
 		setRockCount(heldValue)

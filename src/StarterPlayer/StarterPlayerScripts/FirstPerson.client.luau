@@ -100,6 +100,16 @@ local function lockCamera()
 	player.CameraMaxZoomDistance = 0.5
 end
 
+local function updateCameraMode()
+	if player:GetAttribute("InMatch") == true then
+		lockCamera()
+	else
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMaxZoomDistance = 14
+	end
+end
+
 local function cacheDescendant(descendant: Instance)
 	if descendant:IsA("BasePart") then
 		local accessory = descendant:FindFirstAncestorOfClass("Accessory")
@@ -151,8 +161,8 @@ local function setCharacter(nextCharacter: Model)
 	descendantAddedConnection = nextCharacter.DescendantAdded:Connect(cacheDescendant)
 	descendantRemovingConnection = nextCharacter.DescendantRemoving:Connect(forgetDescendant)
 
-	nextHumanoid.CameraOffset = STANDING_CAMERA_OFFSET
-	lockCamera()
+	nextHumanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
+	updateCameraMode()
 end
 
 local function setJointTransform(name: string, transform: CFrame)
@@ -199,9 +209,15 @@ end
 if player.Character then
 	setCharacter(player.Character)
 else
-	lockCamera()
+	updateCameraMode()
 end
 player.CharacterAdded:Connect(setCharacter)
+player:GetAttributeChangedSignal("InMatch"):Connect(function()
+	updateCameraMode()
+	if humanoid then
+		humanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
+	end
+end)
 
 -- Run after Roblox's camera transparency pass and touch only the cached lower-body
 -- parts. This is a small, constant amount of work per rendered frame.
@@ -209,6 +225,16 @@ RunService:BindToRenderStep("FirstPersonLowerBody", Enum.RenderPriority.Camera.V
 	local currentCharacter = character
 	local currentHumanoid = humanoid
 	if not currentCharacter or not currentHumanoid or currentHumanoid.Health <= 0 then
+		return
+	end
+	if player:GetAttribute("InMatch") ~= true then
+		currentHumanoid.CameraOffset = Vector3.zero
+		for part in visibleParts do
+			if part.Parent then part.LocalTransparencyModifier = 0 end
+		end
+		for part in hiddenFirstPersonParts do
+			if part.Parent then part.LocalTransparencyModifier = 0 end
+		end
 		return
 	end
 
@@ -246,7 +272,7 @@ RunService.PreSimulation:Connect(function()
 		setCrouchPose(0)
 		poseApplied = false
 	end
-	if player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then
+	if player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then
 		setFlashlightArmPose()
 		flashlightPoseApplied = true
 	elseif flashlightPoseApplied then
