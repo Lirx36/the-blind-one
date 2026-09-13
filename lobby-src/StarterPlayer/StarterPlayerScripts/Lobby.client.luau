@@ -330,6 +330,31 @@ local bot = button(panel, "◉  BOT", UDim2.fromOffset(24, 532), UDim2.fromOffse
 local human = button(panel, "♟  PLAYER", UDim2.fromOffset(162, 532), UDim2.fromOffset(142, 42))
 local leave = button(panel, "LEAVE", UDim2.fromOffset(312, 532), UDim2.fromOffset(134, 42))
 leave.TextColor3 = Color3.fromRGB(221, 126, 116)
+local voteRail = Instance.new("Frame")
+voteRail.Name = "VoteBalance"
+voteRail.Position = UDim2.fromOffset(24, 578)
+voteRail.Size = UDim2.fromOffset(422, 3)
+voteRail.BackgroundColor3 = Color3.fromRGB(20, 28, 31)
+voteRail.BorderSizePixel = 0
+voteRail.ClipsDescendants = true
+voteRail.Parent = panel
+local voteRailCorner = Instance.new("UICorner")
+voteRailCorner.CornerRadius = UDim.new(1, 0)
+voteRailCorner.Parent = voteRail
+local botVoteFill = Instance.new("Frame")
+botVoteFill.Name = "BotVotes"
+botVoteFill.Size = UDim2.fromScale(1, 1)
+botVoteFill.BackgroundColor3 = Color3.fromRGB(92, 111, 115)
+botVoteFill.BorderSizePixel = 0
+botVoteFill.Parent = voteRail
+local playerVoteFill = Instance.new("Frame")
+playerVoteFill.Name = "PlayerVotes"
+playerVoteFill.AnchorPoint = Vector2.new(1, 0)
+playerVoteFill.Position = UDim2.fromScale(1, 0)
+playerVoteFill.Size = UDim2.fromScale(0, 1)
+playerVoteFill.BackgroundColor3 = Color3.fromRGB(90, 205, 219)
+playerVoteFill.BorderSizePixel = 0
+playerVoteFill.Parent = voteRail
 local start = button(panel, "BEGIN DESCENT   ››", UDim2.fromOffset(24, 584), UDim2.fromOffset(422, 42))
 start.BackgroundColor3 = Color3.fromRGB(124, 40, 32)
 start.TextColor3 = Color3.fromRGB(255, 239, 228)
@@ -337,6 +362,75 @@ start.TextSize = 13
 local startGradient = Instance.new("UIGradient")
 startGradient.Color = ColorSequence.new(Color3.fromRGB(113, 34, 29), Color3.fromRGB(183, 76, 48))
 startGradient.Parent = start
+
+-- Reference-style elevator occupancy display. This is deliberately separate
+-- from the existing terminal panel, which remains unchanged.
+local elevatorOverlay = Instance.new("CanvasGroup")
+elevatorOverlay.Name = "ElevatorOccupancy"
+elevatorOverlay.AnchorPoint = Vector2.new(0.5, 1)
+elevatorOverlay.Position = UDim2.new(0.5, 0, 1, -24)
+elevatorOverlay.Size = UDim2.fromOffset(650, 154)
+elevatorOverlay.BackgroundTransparency = 1
+elevatorOverlay.Visible = false
+elevatorOverlay.Parent = gui
+local descentReadout = text(elevatorOverlay, "WAITING FOR HOST", 19, Enum.Font.GothamBold)
+descentReadout.Position = UDim2.fromOffset(25, 0)
+descentReadout.Size = UDim2.fromOffset(600, 28)
+descentReadout.TextColor3 = Color3.fromRGB(229, 217, 199)
+descentReadout.TextStrokeTransparency = 0.12
+local portraitStrip = Instance.new("Frame")
+portraitStrip.AnchorPoint = Vector2.new(0.5, 0)
+portraitStrip.Position = UDim2.new(0.5, 0, 0, 34)
+portraitStrip.Size = UDim2.fromOffset(620, 62)
+portraitStrip.BackgroundTransparency = 1
+portraitStrip.Parent = elevatorOverlay
+local portraitLayout = Instance.new("UIListLayout")
+portraitLayout.FillDirection = Enum.FillDirection.Horizontal
+portraitLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+portraitLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+portraitLayout.Padding = UDim.new(0, 8)
+portraitLayout.Parent = portraitStrip
+type PortraitSlot = { frame: Frame, image: ImageLabel, empty: TextLabel, stroke: UIStroke }
+local portraitSlots: { PortraitSlot } = {}
+for index = 1, 10 do
+	local slotFrame = Instance.new("Frame")
+	slotFrame.Name = string.format("Portrait%02d", index)
+	slotFrame.Size = UDim2.fromOffset(54, 54)
+	slotFrame.BackgroundColor3 = Color3.fromRGB(11, 14, 15)
+	slotFrame.BackgroundTransparency = 0.3
+	slotFrame.BorderSizePixel = 0
+	slotFrame.LayoutOrder = index
+	slotFrame.Parent = portraitStrip
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = slotFrame
+	local slotStroke = Instance.new("UIStroke")
+	slotStroke.Color = Color3.fromRGB(126, 143, 143)
+	slotStroke.Transparency = 0.2
+	slotStroke.Thickness = 2
+	slotStroke.Parent = slotFrame
+	local portrait = Instance.new("ImageLabel")
+	portrait.Name = "Avatar"
+	portrait.Position = UDim2.fromOffset(3, 3)
+	portrait.Size = UDim2.new(1, -6, 1, -6)
+	portrait.BackgroundTransparency = 1
+	portrait.Image = ""
+	portrait.ScaleType = Enum.ScaleType.Crop
+	portrait.Parent = slotFrame
+	local portraitCorner = Instance.new("UICorner")
+	portraitCorner.CornerRadius = UDim.new(1, 0)
+	portraitCorner.Parent = portrait
+	local empty = text(slotFrame, "○", 29, Enum.Font.GothamMedium)
+	empty.Size = UDim2.fromScale(1, 1)
+	empty.TextColor3 = Color3.fromRGB(103, 111, 109)
+	empty.TextStrokeTransparency = 0.7
+	table.insert(portraitSlots, { frame = slotFrame, image = portrait, empty = empty, stroke = slotStroke })
+end
+local elevatorCapacity = text(elevatorOverlay, "0 / 4", 27, Enum.Font.GothamBlack)
+elevatorCapacity.Position = UDim2.fromOffset(25, 101)
+elevatorCapacity.Size = UDim2.fromOffset(600, 42)
+elevatorCapacity.TextColor3 = Color3.fromRGB(229, 217, 199)
+elevatorCapacity.TextStrokeTransparency = 0.12
 
 local function resizePanel()
 	local camera = workspace.CurrentCamera
@@ -350,16 +444,58 @@ if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal
 local currentState: any = nil
 local currentQueue: any = nil
 local activeAccent = Color3.fromRGB(90, 205, 219)
+local portraitCache: { [number]: string } = {}
+local portraitGeneration = 0
 local function setSelected(target: TextButton, selected: boolean)
 	target.BackgroundColor3 = if selected then activeAccent:Lerp(Color3.new(), 0.7) else Color3.fromRGB(12, 16, 17)
 	target.TextColor3 = if selected then Color3.fromRGB(246, 250, 247) else Color3.fromRGB(157, 174, 174)
+end
+
+local function updateElevatorPortraits(queue: any)
+	portraitGeneration += 1
+	local generation = portraitGeneration
+	elevatorOverlay.Visible = queue ~= nil
+	if not queue then return end
+	descentReadout.Text = if queue.countdown then tostring(queue.countdown)
+		elseif queue.kind == "Private" then ("PRIVATE BALLOT  //  BOT %d   PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
+		else ("PUBLIC BALLOT  //  BOT %d   PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
+	descentReadout.TextColor3 = activeAccent:Lerp(Color3.new(1, 1, 1), 0.32)
+	elevatorCapacity.TextColor3 = activeAccent:Lerp(Color3.new(1, 1, 1), 0.25)
+	elevatorCapacity.Text = ("%d / %d"):format(#queue.members, queue.capacity)
+	for index, slot in ipairs(portraitSlots) do
+		local member = queue.members[index]
+		slot.frame.Visible = index <= queue.capacity
+		slot.stroke.Color = activeAccent
+		slot.stroke.Transparency = if member then 0.02 else 0.55
+		slot.frame.BackgroundColor3 = if member then activeAccent:Lerp(Color3.new(), 0.72) else Color3.fromRGB(11, 14, 15)
+		slot.empty.Visible = member == nil
+		slot.image.Visible = member ~= nil
+		slot.image.Image = if member then portraitCache[member.userId] or "" else ""
+		if member and not portraitCache[member.userId] then
+			local userId = member.userId
+			task.spawn(function()
+				local ok, content = pcall(function()
+					return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+				end)
+				if not ok then return end
+				portraitCache[userId] = content
+				local liveMember = currentQueue and currentQueue.members[index]
+				if generation == portraitGeneration and liveMember and liveMember.userId == userId then
+					slot.image.Image = content
+				end
+			end)
+		end
+	end
 end
 
 local function updateQueue(queue: any)
 	currentQueue = queue
 	panel.Visible = queue ~= nil
 	panelShadow.Visible = queue ~= nil
-	if not queue then return end
+	if not queue then
+		updateElevatorPortraits(nil)
+		return
+	end
 	local isPrivate = queue.kind == "Private"
 	local isHost = queue.ownerUserId == player.UserId
 	local accentByQueue = {
@@ -370,6 +506,8 @@ local function updateQueue(queue: any)
 		Public = Color3.fromRGB(225, 70, 58),
 	}
 	activeAccent = accentByQueue[queue.id] or Color3.fromRGB(90, 205, 219)
+	updateElevatorPortraits(queue)
+	panelEyebrow.Text = if isPrivate then "SECURE MATCH TERMINAL  //  PARTY BALLOT" else "PUBLIC MATCH TERMINAL  //  LIVE BALLOT"
 	panelStroke.Color = activeAccent
 	headerGlow.BackgroundColor3 = activeAccent
 	headerLine.BackgroundColor3 = activeAccent
@@ -377,12 +515,14 @@ local function updateQueue(queue: any)
 	statusDot.BackgroundColor3 = activeAccent
 	occupancy.TextColor3 = activeAccent
 	rosterBox.ScrollBarImageColor3 = activeAccent
+	start.BackgroundColor3 = activeAccent:Lerp(Color3.new(), 0.62)
+	startGradient.Color = ColorSequence.new(activeAccent:Lerp(Color3.new(), 0.72), activeAccent:Lerp(Color3.new(), 0.38))
 	local queueNumber = tostring(queue.id):match("%d+") or ""
 	panelTitle.Text = if isPrivate then "PRIVATE ELEVATOR " .. string.format("%02d", tonumber(queueNumber) or 0) else "PUBLIC FREIGHT ELEVATOR"
 	panelStatus.Text = if queue.countdown then ("The descent begins in %d seconds..."):format(queue.countdown)
-		elseif isPrivate and isHost then "Configure the party, then begin the descent."
-		elseif isPrivate then "Party secured. Waiting for the host."
-		else "Open matchmaking active. Awaiting more operatives."
+		elseif isPrivate and isHost then "Party ballot active. Begin the descent when ready."
+		elseif isPrivate then "Cast your vote. The host controls departure."
+		else ("Public vote: BOT %d  //  PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
 	occupancy.Text = ("%d / %d READY"):format(#queue.members, queue.capacity)
 	capacityText.Text = ("%d SLOTS"):format(queue.capacity)
 	capacityCard.Visible = isPrivate
@@ -391,11 +531,25 @@ local function updateQueue(queue: any)
 	access.Visible = isPrivate and isHost
 	access.Text = "FRIENDS ONLY  //  " .. (if queue.friendsOnly then "ON" else "OFF")
 	start.Visible = isPrivate and isHost
-	modeTitle.Visible = isHost or not isPrivate
-	modeHint.Visible = isHost or not isPrivate
-	bot.Visible, human.Visible = isHost or not isPrivate, isHost or not isPrivate
-	setSelected(bot, queue.blindMode == "Bot")
-	setSelected(human, queue.blindMode == "Player")
+	modeTitle.Visible = true
+	modeHint.Visible = true
+	bot.Visible, human.Visible = true, true
+	modeTitle.Text = "THE BLIND ONE  //  PARTY VOTE"
+	local botVotes = queue.botVotes or 0
+	local playerVotes = queue.playerVotes or 0
+	modeHint.Text = if botVotes == playerVotes then "DEADLOCK  //  RANDOM ON DESCENT"
+		elseif botVotes > playerVotes then ("BOT MAJORITY  //  +%d"):format(botVotes - playerVotes)
+		else ("PLAYER MAJORITY  //  +%d"):format(playerVotes - botVotes)
+	bot.Text = ("◉  BOT  •  %d"):format(botVotes)
+	human.Text = ("♟  PLAYER  •  %d"):format(playerVotes)
+	setSelected(bot, queue.myVote == "Bot")
+	setSelected(human, queue.myVote == "Player")
+	local totalVotes = math.max(botVotes + playerVotes, 1)
+	botVoteFill.Size = UDim2.fromScale(botVotes / totalVotes, 1)
+	playerVoteFill.Size = UDim2.fromScale(playerVotes / totalVotes, 1)
+	voteRail.BackgroundColor3 = activeAccent:Lerp(Color3.new(), 0.84)
+	botVoteFill.BackgroundColor3 = activeAccent:Lerp(Color3.fromRGB(104, 119, 122), 0.52)
+	playerVoteFill.BackgroundColor3 = activeAccent
 	for index, row in roster do
 		local member = queue.members[index]
 		row.frame.Visible = index <= queue.capacity
@@ -456,9 +610,21 @@ RunService:BindToRenderStep("LobbyCamera", Enum.RenderPriority.Camera.Value + 5,
 			camera.CameraType = Enum.CameraType.Scriptable
 			camera.CFrame = cameraPart.CFrame * CFrame.new(math.sin(os.clock() * 0.2) * 0.32, math.sin(os.clock() * 0.29) * 0.12, 0)
 		end
+	elseif currentQueue then
+		cameraRestored = false
+		local bunker = workspace:FindFirstChild("BunkerLobby")
+		local elevatorRoot = bunker and bunker:FindFirstChild("QueueElevators")
+		local rig = elevatorRoot and elevatorRoot:FindFirstChild("QueueElevator_" .. tostring(currentQueue.id))
+		local cameraPoint = rig and rig:FindFirstChild("CameraPoint")
+		if cameraPoint and cameraPoint:IsA("BasePart") then
+			camera.CameraType = Enum.CameraType.Scriptable
+			camera.FieldOfView = 54
+			camera.CFrame = camera.CFrame:Lerp(cameraPoint.CFrame, 0.13)
+		end
 	elseif not cameraRestored then
 		cameraRestored = true
 		camera.CameraType = Enum.CameraType.Custom
+		camera.FieldOfView = 70
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then camera.CameraSubject = humanoid end
 	end

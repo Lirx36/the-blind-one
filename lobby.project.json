@@ -5,16 +5,19 @@
     "ReplicatedStorage": {
       "Remotes": {
         "$path": "src/ReplicatedStorage/Remotes.luau"
+      },
+        "LobbyElevatorsV28": {
+        "$path": "lobby-src/ReplicatedStorage/LobbyElevators.luau"
       }
     },
     "ServerScriptService": {
-      "LobbyService": {
+      "LobbyServiceV2": {
         "$path": "lobby-src/ServerScriptService/LobbyService.server.luau"
       }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Lobby": {
+        "LobbyV3": {
           "$path": "lobby-src/StarterPlayer/StarterPlayerScripts/Lobby.client.luau"
         },
         "LobbyAudio": {

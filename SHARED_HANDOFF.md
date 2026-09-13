@@ -483,6 +483,15 @@ death and respawn with no custom death screen or jumpscare.
   than remaining frozen while the entire character glides.
 - No playtest was started; the user remains the gameplay tester.
 
+### Charcoal survivor fog pass (2026-09-13)
+
+- Shifted the maze distance fog from cold grey `(92,100,103)` to near-black
+  charcoal `(22,27,29)` without changing its 12-92 stud depth range.
+- Darkened the moving ground banks to charcoal/black and heavily reduced their
+  self-emission, while allowing nearby lamps to catch their edges slightly.
+- Blind One and Photo Mode fog exceptions remain unchanged. No playtest was
+  started; the user remains the gameplay tester.
+
 ### V4 Play-client visibility hotfix (2026-09-13)
 
 - A Play-session report confirmed that the V4 Blind One was absent in Photo
@@ -512,4 +521,113 @@ death and respawn with no custom death screen or jumpscare.
 
 ## 2026-09-13 — V5 confirmed and preview archived
 User confirmed the repaired V5 limp and limb movement work naturally. Restored 26 imported Motor6D skinning connections and preserved them in MonsterAppearance. Archived the obsolete V4 display from Workspace to ServerStorage. Captured V5 as assets/blind-one-analog/v5-rig-review/BlindOneV5Template.rbxmx and included it in default.project.json. Main and lobby Rojo builds passed; user owns Play testing. Both AI and player roles use shared V5 playback.
+
+### Physical lobby elevators (2026-09-13)
+
+- Added persistent, furnished elevator cabins behind all four private modules and
+  the larger public freight opening. The private modules reuse their existing
+  metal panels as sliding doors; the public elevator has a new ribbed,
+  red-striped freight-door pair.
+- Joining or hosting opens the matching doors, disables that opening's blocker,
+  and places all queue members into numbered standing slots inside the cabin.
+  Leaving returns the player outside, while an empty cabin closes again.
+- Starting/departing closes the doors before teleporting. A failed teleport (or
+  Studio's non-teleport test path) reopens them so players are not trapped.
+- Corrected the persistent model-name mismatch: printed Private 01/02 are on
+  the right and Private 03/04 are on the left even though their old model names
+  used the opposite numbering. No Play test was started; the user remains the
+  gameplay tester.
+- Queue members now see a fixed, slightly offset exterior camera framing the
+  open elevator and their avatar inside, matching the supplied reference's POV.
+  The existing right-side match terminal UI was preserved without redesign.
+- Added a separate bottom-centre occupancy strip with circular Roblox headshot
+  portraits, empty-slot circles, live capacity, and the public countdown/status.
+- Removed the old private elevator's solid fake backing so its sliding panels
+  reveal a real cabin. Cabin materials remain bunker-authentic: concrete,
+  steel, diamond plate, cold overhead lighting, and restrained queue accents.
+- A second legacy `PrivateElevatorFrame_*` slab was discovered in front of the
+  new private doors and hidden. Each private opening now uses a purpose-built
+  split bunker lift door with diamond-plate panels, recessed steel sections,
+  structural ribs, bolts, luminous safety edges, descent stencil, dark
+  diamond-plate jambs matching the public lift, and a real animated centre opening.
+- Queue cameras now sit squarely on each doorway's centre axis and aim lower at
+  the occupants instead of using the earlier side angle. Slot 01 is centred, so
+  a solo host is visibly framed inside the cabin. Each cabin light and door
+  safety glow uses the exact matching pad/sign color (pink, orange, cyan,
+  green, or public red) without a white tint.
+- Queue placement now happens immediately as the doors begin opening, then is
+  reaffirmed after the animation. An invisible full-height occupant barrier
+  closes the open doorway, letting queued players move within the cabin without
+  walking back into the lobby; Leave still moves them safely outside.
+- Lowered the private top jamb and shortened/re-centred the public freight door
+  panels, ribs, and glow strips so neither door clips its overhead sign.
+- Public entry now uses a 0.25-second hold-E / gamepad-X ProximityPrompt instead
+  of automatic pad touch. Its straight-on camera was moved much farther back to
+  frame the entire freight lift.
+- Public Bot/Player selection is now one vote per queued player. The live UI
+  shows both totals and highlights only the local player's vote. A strict
+  majority decides the mode; ties choose Bot or Player randomly at departure.
+  When Player wins, the main place's existing `RoleService` randomly selects
+  one party member as the Blind One.
+- Lobby player speed is now 34 studs/second. Private queue placement was made
+  deterministic by zeroing root velocity, setting the root directly, and
+  reaffirming placement several times while the door opens. The solo slot was
+  brought forward and given a matching-color overhead light so the occupant is
+  clearly visible from the fixed camera. No Play test was started; the user
+  remains the gameplay tester.
+- Private cabins were expanded again to a 28 x 16-stud footprint with deeper side
+  walls, ceiling, back wall, rails, floor guides, and status panel, giving
+  occupants room to walk and jump. All private and public sliding panels now
+  disappear behind dedicated diamond-plate wall pockets when opening, matching
+  a real elevator's concealed door travel instead of exposing intersecting
+  panels. No Play test was started.
+- Private Slot 01 now sits 5.8 studs behind the doorway rather than against the
+  occupant barrier, and additional rows use 5-stud spacing. Queue placement now
+  explicitly unanchors the root and performs only one quick 0.15-second
+  correction, eliminating the previous movement hold. Private cameras were
+  pulled back to 40 studs and aimed higher to include the complete overhead
+  module header in the same way as the public freight view.
+- Added a permanent invisible `LobbySafetySpawn` on the bunker floor and assign
+  it as every lobby player's `RespawnLocation`. The menu holding point now uses
+  the same safe floor position, eliminating the default-origin void spawn race.
+- Repaired a live-Studio-only missing `)` after the 0.15-second placement
+  correction. That syntax error had prevented `LobbyServiceV2` from starting,
+  which temporarily bypassed both the menu/loading state and server spawn flow;
+  the repository source already contained the correct closure.
+- The original solid `EastWall` and `WestWall` were discovered crossing the
+  private cabins and blocking the camera/avatar line of sight. They are now
+  replaced visually and physically by three concrete sections per side, leaving
+  real 12-stud openings at both private elevator doors. The wide camera and
+  deeper safe occupant slots therefore work without hiding or trapping avatars.
+- Two separate invisible side `ContainmentCollider` parts were also crossing
+  the same private doorways. They now use matching segmented collision sections,
+  leaving the openings genuinely clear. Queue-specific legacy doorway colliders
+  disable both collision and queries while their elevator is occupied.
+- The public freight elevator now receives the same true-room treatment: its
+  old full-width `ForwardWall` and invisible containment wall are segmented
+  around a real 50-stud opening. The cabin is enlarged to a 44 x 34-stud
+  footprint with extended floor/ceiling/side walls, two rows of freight lights,
+  full-depth floor guides, side handrails, diamond-plate wall panels, rear
+  structural dividers, and a relocated status panel.
+- The obsolete Toolbox `PublicFreightElevator` model that became visible in
+  the centre of the new cabin is archived to `ServerStorage` as
+  `LegacyPublicFreightElevator`. Public camera distance is reduced from 73 to
+  roughly 52 studs, and private camera distance from roughly 46 to 38 studs;
+  both retain their higher header-safe aim to reduce dead space without
+  cropping the overhead labels.
+- Added permanent dark diamond-plate header seals between every door top and
+  overhead sign, plus full private upper bulkheads that meet the bunker ceiling.
+  Matching-color underside accents keep the structures readable. The public
+  freight opening receives a 50-stud-wide lintel that overlaps its doors, sign,
+  existing top structure, and cabin ceiling so no background slit remains.
+- Corrected all four `WallPipes_*` clusters: the front-wall assets are rotated
+  90 degrees, seated flush on the inner East/West wall faces, and assigned one
+  clean invisible collision proxy each. Private header seals and upper
+  bulkheads are also deepened to overlap the original wall by 0.2 studs,
+  eliminating the remaining side-view seam behind each sign.
+- Queue entry now force-confirms the entrance panels at their exact open CFrame
+  immediately after the normal 0.8-second tween, preventing a camera transition
+  from ever leaving the public or private doors visually closed. Rear-wall
+  vertical dividers were replaced with horizontal bunker braces so the far end
+  cannot be mistaken for a second elevator-door set.
 

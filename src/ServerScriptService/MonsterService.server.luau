@@ -40,7 +40,7 @@ local AGENT = {
 	-- collisionless, so a slightly smaller planning radius is both accurate and
 	-- much less likely to reject an otherwise clear route.
 	AgentRadius = 2.25,
-	AgentHeight = 7,
+	AgentHeight = 10,
 	AgentCanJump = false,
 	WaypointSpacing = 5,
 }
@@ -370,6 +370,8 @@ local lastCompute = 0
 local currentGoal = Vector3.zero
 local pathObj = PathfindingService:CreatePath(AGENT)
 local directFallbackGoal: Vector3? = nil
+local routeDirty = false
+local computing = false
 local navigationParams = RaycastParams.new()
 navigationParams.FilterType = Enum.RaycastFilterType.Include
 navigationParams.RespectCanCollide = true
@@ -378,6 +380,18 @@ local function mapCollisionParams(): RaycastParams
 	navigationParams.FilterDescendantsInstances = if map then {map} else {}
 	return navigationParams
 end
+
+-- Sweep the actual standing volume, including low furniture and the head.
+local function passageClear(from: Vector3, to: Vector3): boolean
+	local start = Vector3.new(from.X, ROOT_Y + 1.1, from.Z)
+	local finish = Vector3.new(to.X, ROOT_Y + 1.1, to.Z)
+	return (finish-start).Magnitude < 0.001 or workspace:Blockcast(
+		CFrame.new(start), Vector3.new(3,9.6,3), finish-start, mapCollisionParams()
+	) == nil
+end
+pathObj.Blocked:Connect(function(index)
+	if index >= wpIndex then routeDirty = true end
+end)
 
 local function fallbackRoute(goal: Vector3)
 	local map = workspace:FindFirstChild("GeneratedMap")
@@ -390,23 +404,22 @@ local function fallbackRoute(goal: Vector3)
 			table.insert(fallback, PathWaypoint.new(position, Enum.PathWaypointAction.Walk))
 		end
 		waypoints, wpIndex, directFallbackGoal = fallback, 1, nil
-		if #fallback >= 2 then
-			-- Skip the current cell centre whenever the next passage is already a
-			-- clear shot. This avoids turning back toward the centre on every route
-			-- refresh while still using it to recover from awkward wall corners.
-			local nextPosition = fallback[2].Position
-			local towardNext = Vector3.new(nextPosition.X, ROOT_Y, nextPosition.Z) - root.Position
-			if not workspace:Blockcast(
-				CFrame.new(root.Position),
-				Vector3.new(3, 5, 3),
-				towardNext,
-				mapCollisionParams()
-			) then
-				wpIndex = 2
+		if #fallback >= 2 and passageClear(root.Position, fallback[2].Position) then
+			wpIndex = 2
+		end
+		-- A cell route knows passages, not the furniture inside them. Use it
+		-- only if every segment is actually open; never walk into a locker.
+		local previous = root.Position
+		for index = wpIndex, #fallback do
+			if not passageClear(previous, fallback[index].Position) then
+				waypoints = {}
+				routeDirty = true
+				return
 			end
+			previous = fallback[index].Position
 		end
 	else
-		directFallbackGoal = goal
+		if passageClear(root.Position, goal) then directFallbackGoal = goal end
 	end
 end
 
@@ -414,13 +427,9 @@ local function recompute(goal: Vector3)
 	lastCompute = os.clock()
 	currentGoal = goal
 	directFallbackGoal = nil
-	local map = workspace:FindFirstChild("GeneratedMap")
-	if map and map:GetAttribute("MapKind") == "Maze" then
-		-- The maze's own passage graph is exact. Roblox navmesh paths can shave a
-		-- tight corner and repeatedly point the monster into a wall.
-		fallbackRoute(goal)
-		return
-	end
+	routeDirty = false
+	-- Roblox navigation includes the actual prop colliders. The maze graph
+	-- is a checked fallback only, not the primary route through furnished rooms.
 	local ok = pcall(function()
 		pathObj:ComputeAsync(root.Position, goal)
 	end)
@@ -438,10 +447,8 @@ local function recompute(goal: Vector3)
 	else
 		waypoints = {}
 		wpIndex = 1
-		-- Pathfinding occasionally has no navmesh ready immediately after the
-		-- procedural map is built. The Blind One is moved by CFrame and has no
-		-- collisions, so direct steering is a safe temporary fallback. A fresh
-		-- path is attempted again on the normal refresh interval.
+		-- While navigation is unavailable, accept only a fully clear fallback.
+		-- An obstructed fallback stays stopped until the throttled retry.
 		fallbackRoute(goal)
 	end
 end
@@ -470,18 +477,22 @@ task.spawn(function()
 			monster:SetAttribute("NavigationState", state)
 			monster:SetAttribute("NavigationWaypoint", wpIndex)
 			monster:SetAttribute("NavigationGoal", goal)
-			if moved or stale or missingRoute or (finishedRoute and (goal-root.Position).Magnitude > 4.5) then
+			local needsRoute = moved or stale or missingRoute or routeDirty
+				or (finishedRoute and (goal-root.Position).Magnitude > 4.5)
+			if needsRoute and not computing and os.clock()-lastCompute >= 0.75 then
+				computing = true
 				recompute(goal)
+				computing = false
 			end
 		end
 		task.wait(0.15)
 	end
 end)
 
-local blockedSince: number? = nil
+
 local lastProgressPosition = root.Position
 local lastProgressAt = os.clock()
-local sidestepSign = 1
+
 
 local function abandonBlockedRoute()
 	waypoints = {}
@@ -528,7 +539,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local toTarget = target - root.Position
 	local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
 
-	if flat.Magnitude < 2.5 then
+	if flat.Magnitude < 0.4 then
 		if wp then
 			wpIndex += 1
 			if wpIndex > #waypoints then
@@ -546,48 +557,16 @@ RunService.Heartbeat:Connect(function(dt)
 	local dir = flat.Unit
 	monster:SetAttribute("VisualMoveSpeed", currentSpeed)
 	local step = dir * math.min(currentSpeed * math.min(dt, 0.1), flat.Magnitude)
-	local hit = workspace:Blockcast(CFrame.new(root.Position), Vector3.new(3,5,3), step, mapCollisionParams())
-	if hit then
-		-- Bound recovery even when sliding succeeds; otherwise its early
-		-- return bypasses the stuck timer forever.
-		if blockedSince and os.clock() - blockedSince > 1.25 then
-			abandonBlockedRoute()
-			blockedSince = nil
-			return
-		end
+	if not passageClear(root.Position, root.Position + step) then
 		monster:SetAttribute("VisualMoveSpeed", 0)
-		blockedSince = blockedSince or os.clock()
-
-		-- Slide along the obstacle instead of planting his face into it. This is
-		-- especially useful for crates and the bevelled corners of maze walls.
-		local flatNormal = Vector3.new(hit.Normal.X, 0, hit.Normal.Z)
-		if flatNormal.Magnitude > 0.01 then
-			flatNormal = flatNormal.Unit
-			local slide = step - flatNormal * step:Dot(flatNormal)
-			if slide.Magnitude > 0.015
-				and not workspace:Blockcast(CFrame.new(root.Position), Vector3.new(3,5,3), slide, mapCollisionParams()) then
-				monster:PivotTo(CFrame.new(root.Position + slide) * root.CFrame.Rotation)
-				return
-			end
-
-			local tangent = Vector3.new(-flatNormal.Z, 0, flatNormal.X)
-			for _, sign in { sidestepSign, -sidestepSign } do
-				local sidestep = tangent * sign * math.max(step.Magnitude, 0.12)
-				if not workspace:Blockcast(CFrame.new(root.Position), Vector3.new(2.5,5,2.5), sidestep, mapCollisionParams()) then
-					sidestepSign = sign
-					monster:PivotTo(CFrame.new(root.Position + sidestep) * root.CFrame.Rotation)
-					return
-				end
-			end
-		end
-
-		if os.clock() - (blockedSince :: number) > 0.55 then
-			abandonBlockedRoute()
-			blockedSince = nil
-		end
+		-- Stop and plan a real detour. Blind sideways steps can oscillate or
+		-- trap the monster against the same obstacle.
+		waypoints = {}
+		wpIndex = 1
+		directFallbackGoal = nil
+		routeDirty = true
 		return
 	end
-	blockedSince = nil
 	local newPos = root.Position + step
 	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
 	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))

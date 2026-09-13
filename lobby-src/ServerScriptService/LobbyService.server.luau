@@ -8,6 +8,7 @@ local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local LobbyElevators = require(ReplicatedStorage:WaitForChild("LobbyElevatorsV28"))
 local actionRemote = Remotes.LobbyAction
 local stateRemote = Remotes.LobbyState
 
@@ -18,6 +19,31 @@ local PRIVATE_CAPACITY_MAX = 6
 local PUBLIC_CAPACITY = 10
 local PUBLIC_COUNTDOWN = 15
 
+local function ensureSafetySpawn(): SpawnLocation
+	local existing = workspace:FindFirstChild("LobbySafetySpawn")
+	if existing and not existing:IsA("SpawnLocation") then existing:Destroy() end
+	local spawnLocation = workspace:FindFirstChild("LobbySafetySpawn") :: SpawnLocation?
+	if not spawnLocation then
+		spawnLocation = Instance.new("SpawnLocation")
+		spawnLocation.Name = "LobbySafetySpawn"
+		spawnLocation.Parent = workspace
+	end
+	spawnLocation.Size = Vector3.new(8, 1, 8)
+	spawnLocation.CFrame = CFrame.new(ORIGIN + Vector3.new(0, 3, -70))
+	spawnLocation.Transparency = 1
+	spawnLocation.CanCollide = false
+	spawnLocation.CanQuery = false
+	spawnLocation.CanTouch = false
+	spawnLocation.Anchored = true
+	spawnLocation.Enabled = true
+	spawnLocation.Neutral = true
+	spawnLocation.AllowTeamChangeOnTouch = false
+	spawnLocation.Duration = 0
+	return spawnLocation
+end
+
+local safetySpawn = ensureSafetySpawn()
+
 type Queue = {
 	id: string,
 	kind: string,
@@ -26,6 +52,7 @@ type Queue = {
 	friendsOnly: boolean,
 	blindMode: string,
 	members: { [Player]: boolean },
+	votes: { [Player]: string },
 	countdown: number?,
 	generation: number,
 	launching: boolean,
@@ -90,17 +117,35 @@ local function queueCount(queue: Queue): number
 	return count
 end
 
+local function voteCounts(queue: Queue): (number, number)
+	local botVotes = 0
+	local playerVotes = 0
+	for member in queue.members do
+		local vote = queue.votes[member]
+		if vote == "Player" then playerVotes += 1 else botVotes += 1 end
+	end
+	return botVotes, playerVotes
+end
+
+local function resolveVote(queue: Queue): string
+	local botVotes, playerVotes = voteCounts(queue)
+	if playerVotes > botVotes then return "Player" end
+	if botVotes > playerVotes then return "Bot" end
+	return if math.random(1, 2) == 1 then "Player" else "Bot"
+end
+
 local function updateWorldLabel(queue: Queue)
 	if not queue.label then return end
 	local count = queueCount(queue)
 	if queue.kind == "Public" then
 		queue.label.Text = if queue.countdown then
 			("%d/%d  •  DEPARTING IN %d"):format(count, queue.capacity, queue.countdown)
-			else ("%d/%d  •  WALK IN TO JOIN"):format(count, queue.capacity)
+			else ("%d/%d  •  HOLD E TO JOIN"):format(count, queue.capacity)
 	else
 		local access = if queue.friendsOnly then "FRIENDS ONLY" else "OPEN PARTY"
+		local botVotes, playerVotes = voteCounts(queue)
 		queue.label.Text = if queue.ownerUserId then
-			("%d/%d  •  %s  •  %s"):format(count, queue.capacity, access, string.upper(queue.blindMode))
+			("%d/%d  •  %s  •  VOTE B%d / P%d"):format(count, queue.capacity, access, botVotes, playerVotes)
 			else "EMPTY  •  ENTER TO HOST"
 	end
 end
@@ -109,6 +154,7 @@ local function stateFor(player: Player)
 	local queue = playerQueue[player]
 	local queueData = nil
 	if queue then
+		local botVotes, playerVotes = voteCounts(queue)
 		local members = {}
 		for member in queue.members do
 			if member.Parent == Players then
@@ -127,6 +173,9 @@ local function stateFor(player: Player)
 			capacity = queue.capacity,
 			friendsOnly = queue.friendsOnly,
 			blindMode = queue.blindMode,
+			myVote = queue.votes[player],
+			botVotes = botVotes,
+			playerVotes = playerVotes,
 			countdown = queue.countdown,
 			members = members,
 		}
@@ -142,10 +191,28 @@ local function broadcast()
 	for _, player in Players:GetPlayers() do stateRemote:FireClient(player, stateFor(player)) end
 end
 
+local function orderedQueueMembers(queue: Queue): { Player }
+	local members = {}
+	for member in queue.members do
+		if member.Parent == Players then table.insert(members, member) end
+	end
+	table.sort(members, function(a, b) return a.UserId < b.UserId end)
+	return members
+end
+
+local function placeQueueMembers(queue: Queue)
+	for index, member in ipairs(orderedQueueMembers(queue)) do
+		local character = member.Character
+		if character then LobbyElevators.MoveInside(queue.id, character, index) end
+	end
+end
+
 local function removeFromQueue(player: Player)
 	local queue = playerQueue[player]
 	if not queue then return end
+	LobbyElevators.MoveOutside(queue.id, player.Character)
 	queue.members[player] = nil
+	queue.votes[player] = nil
 	playerQueue[player] = nil
 	player:SetAttribute("QueueId", nil)
 	queue.generation += 1
@@ -154,12 +221,17 @@ local function removeFromQueue(player: Player)
 		queue.ownerUserId = nil
 		for member in queue.members do queue.ownerUserId = member.UserId break end
 	end
-	if queueCount(queue) == 0 and queue.kind == "Private" then
-		queue.ownerUserId = nil
-		queue.capacity = 4
-		queue.friendsOnly = true
+	if queueCount(queue) == 0 then
+		queue.votes = {}
 		queue.blindMode = "Bot"
+		if queue.kind == "Private" then
+			queue.ownerUserId = nil
+			queue.capacity = 4
+			queue.friendsOnly = true
+		end
 	end
+	LobbyElevators.SetOpen(queue.id, queueCount(queue) > 0)
+	task.defer(placeQueueMembers, queue)
 	broadcast()
 end
 
@@ -198,14 +270,18 @@ end
 
 local function launch(queue: Queue)
 	if queue.launching or queueCount(queue) == 0 then return end
+	queue.blindMode = resolveVote(queue)
 	if queue.blindMode == "Player" and queueCount(queue) < 2 then return end
 	queue.launching = true
 	broadcast()
+	LobbyElevators.SetOpen(queue.id, false)
+	task.wait(LobbyElevators.DOOR_TIME + 0.08)
 	local party = {}
 	for member in queue.members do if member.Parent == Players then table.insert(party, member) end end
 	if RunService:IsStudio() then
 		queue.launching = false
 		queue.countdown = nil
+		LobbyElevators.SetOpen(queue.id, true)
 		broadcast()
 		return
 	end
@@ -215,6 +291,7 @@ local function launch(queue: Queue)
 	local ok = pcall(function() TeleportService:TeleportAsync(GAME_PLACE_ID, party, options) end)
 	if not ok then
 		queue.launching = false
+		LobbyElevators.SetOpen(queue.id, true)
 		broadcast()
 	end
 end
@@ -246,9 +323,20 @@ local function joinQueue(player: Player, queue: Queue)
 	end
 	removeFromQueue(player)
 	queue.members[player] = true
+	queue.votes[player] = "Bot"
 	playerQueue[player] = queue
 	player:SetAttribute("QueueId", queue.id)
 	if queue.kind == "Private" and not queue.ownerUserId then queue.ownerUserId = player.UserId end
+	LobbyElevators.SetOpen(queue.id, true)
+	placeQueueMembers(queue)
+	task.delay(0.15, function()
+		if playerQueue[player] == queue then placeQueueMembers(queue) end
+	end)
+	task.delay(LobbyElevators.DOOR_TIME + 0.12, function()
+		if playerQueue[player] == queue and queueCount(queue) > 0 then
+			LobbyElevators.SetOpen(queue.id, true, true)
+		end
+	end)
 	broadcast()
 	startPublicCountdown(queue)
 end
@@ -421,13 +509,13 @@ local function buildHub()
 		prompt.MaxActivationDistance = 13
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = pad
-		local queue: Queue = { id = "Private" .. index, kind = "Private", ownerUserId = nil, capacity = 4, friendsOnly = true, blindMode = "Bot", members = {}, countdown = nil, generation = 0, launching = false, label = nil }
+		local queue: Queue = { id = "Private" .. index, kind = "Private", ownerUserId = nil, capacity = 4, friendsOnly = true, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
 		queue.label = addWorldLabel(pad, "PRIVATE MODULE " .. index, "EMPTY  •  ENTER TO HOST")
 		queues[queue.id] = queue
 		prompt.Triggered:Connect(function(player) joinQueue(player, queue) end)
 	end
 	local publicPad = makePart(folder, "PublicQueue", Vector3.new(128,0.6,30), CFrame.new(ORIGIN + Vector3.new(0,1,68)), Color3.fromRGB(240, 151, 67), Enum.Material.SmoothPlastic)
-	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, countdown = nil, generation = 0, launching = false, label = nil }
+	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
 	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", "0/10  •  WALK IN TO JOIN")
 	queues.Public = publicQueue
 	local touchDebounce: { [Player]: number } = {}
@@ -500,7 +588,7 @@ local function buildBunkerHub()
 	hubSpawn = makePart(folder, "HubSpawn", Vector3.new(4, 1, 4), CFrame.new(ORIGIN + Vector3.new(0, 3, -70)), hiddenColor, Enum.Material.SmoothPlastic)
 	hubSpawn.Transparency = 1
 	hubSpawn.CanCollide = false
-	menuHolding = makePart(folder, "MenuHolding", Vector3.new(4, 1, 4), CFrame.new(ORIGIN + Vector3.new(0, 3, -78)), hiddenColor, Enum.Material.SmoothPlastic)
+	menuHolding = makePart(folder, "MenuHolding", Vector3.new(4, 1, 4), CFrame.new(ORIGIN + Vector3.new(0, 3, -70)), hiddenColor, Enum.Material.SmoothPlastic)
 	menuHolding.Transparency = 1
 	menuHolding.CanCollide = false
 	local camera = makePart(folder, "MenuCamera", Vector3.one, CFrame.new(ORIGIN + Vector3.new(25, 11, -80)), hiddenColor, Enum.Material.SmoothPlastic)
@@ -530,7 +618,7 @@ local function buildBunkerHub()
 		prompt.MaxActivationDistance = 14
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = pad
-		local queue: Queue = { id = "Private" .. index, kind = "Private", ownerUserId = nil, capacity = 4, friendsOnly = true, blindMode = "Bot", members = {}, countdown = nil, generation = 0, launching = false, label = nil }
+		local queue: Queue = { id = "Private" .. index, kind = "Private", ownerUserId = nil, capacity = 4, friendsOnly = true, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
 		queue.label = addWorldLabel(pad, "PRIVATE " .. string.format("%02d", index), "EMPTY  •  ENTER")
 		queues[queue.id] = queue
 		prompt.Triggered:Connect(function(player) joinQueue(player, queue) end)
@@ -538,17 +626,19 @@ local function buildBunkerHub()
 
 	local publicPad = makePart(folder, "PublicQueue", Vector3.new(50, 0.35, 21), CFrame.new(ORIGIN + Vector3.new(0, 2.25, 68)), Color3.fromRGB(177, 39, 33), Enum.Material.Neon)
 	publicPad.Transparency = 0.78
-	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, countdown = nil, generation = 0, launching = false, label = nil }
-	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", "0/10  •  CROSS THE HAZARD LINE")
+	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
+	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", "0/10  •  HOLD E TO JOIN")
 	queues.Public = publicQueue
-	local touchDebounce: { [Player]: number } = {}
-	publicPad.Touched:Connect(function(hit)
-		local character = hit:FindFirstAncestorOfClass("Model")
-		local player = character and Players:GetPlayerFromCharacter(character)
-		if not player or (touchDebounce[player] or 0) > os.clock() then return end
-		touchDebounce[player] = os.clock() + 1
-		joinQueue(player, publicQueue)
-	end)
+	local publicPrompt = Instance.new("ProximityPrompt")
+	publicPrompt.ActionText = "Enter public matchmaking"
+	publicPrompt.ObjectText = "PUBLIC FREIGHT ELEVATOR"
+	publicPrompt.KeyboardKeyCode = Enum.KeyCode.E
+	publicPrompt.GamepadKeyCode = Enum.KeyCode.ButtonX
+	publicPrompt.HoldDuration = 0.25
+	publicPrompt.MaxActivationDistance = 22
+	publicPrompt.RequiresLineOfSight = false
+	publicPrompt.Parent = publicPad
+	publicPrompt.Triggered:Connect(function(player) joinQueue(player, publicQueue) end)
 end
 
 local function enableDetailedDecorCollision()
@@ -590,12 +680,21 @@ local function moveCharacter(player: Player, character: Model)
 	local root = character:WaitForChild("HumanoidRootPart", 8)
 	if not root or not root:IsA("BasePart") then return end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if humanoid then humanoid.WalkSpeed = 20 end
+	if humanoid then humanoid.WalkSpeed = 34 end
+	local queue = playerQueue[player]
+	if queue then
+		root.Anchored = false
+		for index, member in ipairs(orderedQueueMembers(queue)) do
+			if member == player then LobbyElevators.MoveInside(queue.id, character, index) break end
+		end
+		return
+	end
 	character:PivotTo((if player:GetAttribute("InHub") == true then hubSpawn else menuHolding).CFrame + Vector3.new(0,4,0))
 	root.Anchored = player:GetAttribute("InHub") ~= true
 end
 
 local function setupPlayer(player: Player)
+	player.RespawnLocation = safetySpawn
 	local joinData = player:GetJoinData()
 	local teleportData = joinData.TeleportData
 	local direct = typeof(teleportData) == "table" and teleportData.DirectMatch == true
@@ -625,8 +724,8 @@ actionRemote.OnServerEvent:Connect(function(player: Player, action: string, valu
 	elseif action == "FriendsOnly" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId then
 		queue.friendsOnly = value == true
 		broadcast()
-	elseif action == "BlindMode" and queue and (queue.kind == "Public" or queue.ownerUserId == player.UserId) then
-		queue.blindMode = value == "Player" and "Player" or "Bot"
+	elseif action == "BlindMode" and queue then
+		queue.votes[player] = value == "Player" and "Player" or "Bot"
 		broadcast()
 	elseif action == "Start" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId then
 		launch(queue)
@@ -639,6 +738,7 @@ Players.PlayerRemoving:Connect(function(player)
 	removeFromQueue(player)
 end)
 
+LobbyElevators.Ensure()
 buildBunkerHub()
 enableDetailedDecorCollision()
 workspace:SetAttribute("BlindOneMode", "Bot")

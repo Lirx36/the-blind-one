@@ -17,7 +17,9 @@ for z=-2,2 do
 		anchor.CastShadow,anchor.Parent=false,folder
 		local emitter=Instance.new("ParticleEmitter")
 		emitter.Name,emitter.Texture="Mist","rbxasset://textures/particles/smoke_main.dds"
-		emitter.Color=ColorSequence.new(Color3.fromRGB(117,130,134),Color3.fromRGB(91,108,111))
+		-- Near-black charcoal banks: still readable against the floor, but no
+		-- longer the flat pale-grey wash that fought the horror lighting.
+		emitter.Color=ColorSequence.new(Color3.fromRGB(42,49,51),Color3.fromRGB(15,18,19))
 		emitter.Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,1),
 			NumberSequenceKeypoint.new(0.15,0.88),
@@ -32,8 +34,8 @@ for z=-2,2 do
 		emitter.Speed,emitter.Acceleration=NumberRange.new(0.1,0.4),Vector3.new(0.09,0,0.04)
 		emitter.Rotation,emitter.RotSpeed=NumberRange.new(0,360),NumberRange.new(-2,2)
 		emitter.SpreadAngle=Vector2.new(180,180)
-		-- Most of the fog color survives the dark ambient lighting.
-		emitter.LightInfluence,emitter.LightEmission=0.12,0.2
+		-- Let lamps barely catch the mist without making it self-illuminated grey.
+		emitter.LightInfluence,emitter.LightEmission=0.55,0.035
 		emitter.LockedToPart,emitter.Enabled=false,false
 		emitter.Parent=anchor
 		table.insert(patches,{part=anchor,emitter=emitter,x=x,z=z})
