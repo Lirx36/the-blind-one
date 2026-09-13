@@ -1,0 +1,114 @@
+{
+  "status": "static Roblox comparison preview",
+  "source": "TheBlindOne_V4_Detail.blend",
+  "source_sha256": "8CB9C6F007408BA9615681B041582B06F5D4FFD059B00A24267D210AAC044A63",
+  "source_unchanged": true,
+  "replaces_current_monster": false,
+  "rigged": false,
+  "source_objects": 1048,
+  "export_objects": 26,
+  "total_triangles": 252316,
+  "max_triangles_per_mesh": 16920,
+  "mesh_triangles": {
+    "Curved elongated ivory faceplate": 10656,
+    "Left sleeve": 16920,
+    "Long continuous robe": 16920,
+    "Loose blouse gathered into sash": 16920,
+    "Right sleeve": 16920,
+    "V4_binding_01": 10800,
+    "V4_binding_02": 10800,
+    "V4_binding_03": 10800,
+    "V4_binding_04": 10800,
+    "V4_binding_05": 13816,
+    "V4_binding_06": 13824,
+    "V4_binding_07": 4160,
+    "V4_cloth_01": 12432,
+    "V4_cloth_02": 10800,
+    "V4_cloth_03": 3600,
+    "V4_crack_01": 560,
+    "V4_eyes_01": 640,
+    "V4_fold_01": 320,
+    "V4_mask_01": 1076,
+    "V4_skin_01": 13404,
+    "V4_skin_02": 10204,
+    "V4_stitch_01": 13948,
+    "V4_stitch_02": 13988,
+    "V4_stitch_03": 768,
+    "V4_void_01": 320,
+    "Worn shoulder mantle": 16920
+  },
+  "removed_subdivision_modifiers": {
+    "Long continuous robe": [
+      "Cloth surface smoothing"
+    ],
+    "Loose blouse gathered into sash": [
+      "Cloth surface smoothing"
+    ],
+    "Worn shoulder mantle": [
+      "Cloth surface smoothing"
+    ],
+    "Loose scarf fall 0": [
+      "Cloth surface smoothing"
+    ],
+    "Loose scarf fall 1": [
+      "Cloth surface smoothing"
+    ],
+    "Left sleeve": [
+      "Cloth surface smoothing"
+    ],
+    "Left organic exposed forearm": [
+      "Organic skin smoothing"
+    ],
+    "Left palm": [
+      "Organic skin smoothing"
+    ],
+    "Right sleeve": [
+      "Cloth surface smoothing"
+    ],
+    "Right organic exposed forearm": [
+      "Organic skin smoothing"
+    ],
+    "Right palm": [
+      "Organic skin smoothing"
+    ]
+  },
+  "decimated_meshes": {
+    "Long continuous robe": {
+      "before": 38116,
+      "after": 16920
+    },
+    "Loose blouse gathered into sash": {
+      "before": 38124,
+      "after": 16920
+    },
+    "Worn shoulder mantle": {
+      "before": 38116,
+      "after": 16920
+    },
+    "Left sleeve": {
+      "before": 38116,
+      "after": 16920
+    },
+    "Right sleeve": {
+      "before": 38112,
+      "after": 16920
+    }
+  },
+  "materials": [
+    "Roblox_V4_CharcoalCloth",
+    "Roblox_V4_DeepFolds",
+    "Roblox_V4_EyeSocket",
+    "Roblox_V4_LeatherySkin",
+    "Roblox_V4_MaskCrevices",
+    "Roblox_V4_PinprickEyes",
+    "Roblox_V4_StainedIvoryMask",
+    "Roblox_V4_WeatheredBindings",
+    "Roblox_V4_WornStitching"
+  ],
+  "notes": [
+    "This is a visual comparison asset, not the live gameplay rig.",
+    "The original V4 Blender file is preserved byte-for-byte.",
+    "Procedural Blender shading was replaced with Roblox-export-safe PBR colors; geometric seams, folds and cracks remain.",
+    "Rigging and animation transfer happen only after the appearance is approved."
+  ]
+}

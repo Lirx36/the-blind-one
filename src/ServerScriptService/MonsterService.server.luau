@@ -145,10 +145,36 @@ end
 Players.PlayerRemoving:Connect(function(player)
 	if player == photoOwner then stopPhotoMode() end
 end)
-Remotes.PhotoMode.OnServerEvent:Connect(function(player: Player, requested: boolean?)
+local function movePhotoOwnerToCamera(player: Player, exitFrame: CFrame?)
+	if typeof(exitFrame) ~= "CFrame" then
+		return
+	end
+	local position = exitFrame.Position
+	if position.X ~= position.X or position.Y ~= position.Y or position.Z ~= position.Z or position.Magnitude > 10000 then
+		return
+	end
+	local character = player.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not character or not rootPart or not rootPart:IsA("BasePart") or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local flatLook = Vector3.new(exitFrame.LookVector.X, 0, exitFrame.LookVector.Z)
+	local target = if flatLook.Magnitude > 0.001
+		then CFrame.lookAt(position, position + flatLook.Unit)
+		else CFrame.new(position)
+	character:PivotTo(target)
+	rootPart.AssemblyLinearVelocity = Vector3.zero
+	rootPart.AssemblyAngularVelocity = Vector3.zero
+end
+
+Remotes.PhotoMode.OnServerEvent:Connect(function(player: Player, requested: boolean?, exitFrame: CFrame?)
 	-- Photo mode is a Studio-only solo-testing aid; it can never freeze a live
 	-- game or a player-controlled Blind One.
 	if player == photoOwner and (requested == false or photoFrozen) then
+		if requested == false then
+			movePhotoOwnerToCamera(player, exitFrame)
+		end
 		stopPhotoMode()
 		return
 	end
@@ -364,6 +390,21 @@ local function fallbackRoute(goal: Vector3)
 			table.insert(fallback, PathWaypoint.new(position, Enum.PathWaypointAction.Walk))
 		end
 		waypoints, wpIndex, directFallbackGoal = fallback, 1, nil
+		if #fallback >= 2 then
+			-- Skip the current cell centre whenever the next passage is already a
+			-- clear shot. This avoids turning back toward the centre on every route
+			-- refresh while still using it to recover from awkward wall corners.
+			local nextPosition = fallback[2].Position
+			local towardNext = Vector3.new(nextPosition.X, ROOT_Y, nextPosition.Z) - root.Position
+			if not workspace:Blockcast(
+				CFrame.new(root.Position),
+				Vector3.new(3, 5, 3),
+				towardNext,
+				mapCollisionParams()
+			) then
+				wpIndex = 2
+			end
+		end
 	else
 		directFallbackGoal = goal
 	end
@@ -373,6 +414,13 @@ local function recompute(goal: Vector3)
 	lastCompute = os.clock()
 	currentGoal = goal
 	directFallbackGoal = nil
+	local map = workspace:FindFirstChild("GeneratedMap")
+	if map and map:GetAttribute("MapKind") == "Maze" then
+		-- The maze's own passage graph is exact. Roblox navmesh paths can shave a
+		-- tight corner and repeatedly point the monster into a wall.
+		fallbackRoute(goal)
+		return
+	end
 	local ok = pcall(function()
 		pathObj:ComputeAsync(root.Position, goal)
 	end)
@@ -414,7 +462,15 @@ task.spawn(function()
 			local moved = (goal - currentGoal).Magnitude > 6
 			local missingRoute = #waypoints == 0 and directFallbackGoal == nil
 			local finishedRoute = #waypoints > 0 and wpIndex > #waypoints and directFallbackGoal == nil
-			if moved or os.clock() - lastCompute > maxAge or missingRoute or finishedRoute then
+			local map = workspace:FindFirstChild("GeneratedMap")
+			local isMaze = map and map:GetAttribute("MapKind") == "Maze"
+			-- Preserve waypoint progress on the fixed maze graph. Rebuilding an
+			-- unchanged route sends us back toward the current cell's centre.
+			local stale = not isMaze and os.clock() - lastCompute > maxAge
+			monster:SetAttribute("NavigationState", state)
+			monster:SetAttribute("NavigationWaypoint", wpIndex)
+			monster:SetAttribute("NavigationGoal", goal)
+			if moved or stale or missingRoute or (finishedRoute and (goal-root.Position).Magnitude > 4.5) then
 				recompute(goal)
 			end
 		end
@@ -422,7 +478,22 @@ task.spawn(function()
 	end
 end)
 
--- mover: glide the anchored root along the path by CFrame every frame
+local blockedSince: number? = nil
+local lastProgressPosition = root.Position
+local lastProgressAt = os.clock()
+local sidestepSign = 1
+
+local function abandonBlockedRoute()
+	waypoints = {}
+	wpIndex = 1
+	directFallbackGoal = nil
+	lastCompute = 0
+	if state == "wander" then
+		wanderGoal = nil
+	end
+end
+
+-- mover: carry the anchored root along the path by CFrame every frame
 RunService.Heartbeat:Connect(function(dt)
 	local humanMonster = humanBlindOne()
 	if spawnReady then
@@ -477,14 +548,59 @@ RunService.Heartbeat:Connect(function(dt)
 	local step = dir * math.min(currentSpeed * math.min(dt, 0.1), flat.Magnitude)
 	local hit = workspace:Blockcast(CFrame.new(root.Position), Vector3.new(3,5,3), step, mapCollisionParams())
 	if hit then
+		-- Bound recovery even when sliding succeeds; otherwise its early
+		-- return bypasses the stuck timer forever.
+		if blockedSince and os.clock() - blockedSince > 1.25 then
+			abandonBlockedRoute()
+			blockedSince = nil
+			return
+		end
 		monster:SetAttribute("VisualMoveSpeed", 0)
-		lastCompute = 0
+		blockedSince = blockedSince or os.clock()
+
+		-- Slide along the obstacle instead of planting his face into it. This is
+		-- especially useful for crates and the bevelled corners of maze walls.
+		local flatNormal = Vector3.new(hit.Normal.X, 0, hit.Normal.Z)
+		if flatNormal.Magnitude > 0.01 then
+			flatNormal = flatNormal.Unit
+			local slide = step - flatNormal * step:Dot(flatNormal)
+			if slide.Magnitude > 0.015
+				and not workspace:Blockcast(CFrame.new(root.Position), Vector3.new(3,5,3), slide, mapCollisionParams()) then
+				monster:PivotTo(CFrame.new(root.Position + slide) * root.CFrame.Rotation)
+				return
+			end
+
+			local tangent = Vector3.new(-flatNormal.Z, 0, flatNormal.X)
+			for _, sign in { sidestepSign, -sidestepSign } do
+				local sidestep = tangent * sign * math.max(step.Magnitude, 0.12)
+				if not workspace:Blockcast(CFrame.new(root.Position), Vector3.new(2.5,5,2.5), sidestep, mapCollisionParams()) then
+					sidestepSign = sign
+					monster:PivotTo(CFrame.new(root.Position + sidestep) * root.CFrame.Rotation)
+					return
+				end
+			end
+		end
+
+		if os.clock() - (blockedSince :: number) > 0.55 then
+			abandonBlockedRoute()
+			blockedSince = nil
+		end
 		return
 	end
+	blockedSince = nil
 	local newPos = root.Position + step
 	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
 	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))
 	monster:PivotTo(CFrame.new(newPos) * easedRot)
+	if (newPos - lastProgressPosition).Magnitude >= 1.5 then
+		lastProgressPosition = newPos
+		lastProgressAt = os.clock()
+	elseif os.clock() - lastProgressAt > 1.25 then
+		-- A second safety net for corner overlaps that return inconsistent casts.
+		abandonBlockedRoute()
+		lastProgressPosition = newPos
+		lastProgressAt = os.clock()
+	end
 end)
 
 -- brief invulnerability right after (re)spawning

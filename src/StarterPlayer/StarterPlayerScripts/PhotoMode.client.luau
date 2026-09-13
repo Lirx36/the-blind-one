@@ -25,6 +25,54 @@ local function resolveControls()
 	return controls
 end
 local flightState: any = nil
+local wallTransparency: { [BasePart]: number } = {}
+local wallAddedConnection: RBXScriptConnection? = nil
+local XRAY_TRANSPARENCY = 0.88
+
+local function setWallXrayPart(instance: Instance)
+	if not instance:IsA("BasePart") or wallTransparency[instance] ~= nil then
+		return
+	end
+	wallTransparency[instance] = instance.LocalTransparencyModifier
+	instance.LocalTransparencyModifier = math.max(instance.LocalTransparencyModifier, XRAY_TRANSPARENCY)
+end
+
+local function enableWallXray()
+	local map = workspace:FindFirstChild("GeneratedMap")
+	if not map then
+		return
+	end
+	for _, folderName in { "MazeWalls", "MazeRoof" } do
+		local folder = map:FindFirstChild(folderName)
+		if folder then
+			for _, descendant in folder:GetDescendants() do
+				setWallXrayPart(descendant)
+			end
+			setWallXrayPart(folder)
+		end
+	end
+	wallAddedConnection = map.DescendantAdded:Connect(function(descendant)
+		local walls = map:FindFirstChild("MazeWalls")
+		local roof = map:FindFirstChild("MazeRoof")
+		if (walls and descendant:IsDescendantOf(walls)) or (roof and descendant:IsDescendantOf(roof)) then
+			setWallXrayPart(descendant)
+		end
+	end)
+end
+
+local function restoreWallXray()
+	if wallAddedConnection then
+		wallAddedConnection:Disconnect()
+		wallAddedConnection = nil
+	end
+	for part, original in wallTransparency do
+		if part.Parent then
+			part.LocalTransparencyModifier = original
+		end
+	end
+	table.clear(wallTransparency)
+end
+
 local windowFocused = true
 UserInputService.WindowFocused:Connect(function() windowFocused = true end)
 UserInputService.WindowFocusReleased:Connect(function() windowFocused = false end)
@@ -76,9 +124,13 @@ end
 
 local function stopFlight()
 	local state = flightState
-	if not state then return end
+	if not state then
+		restoreWallXray()
+		return
+	end
 	flightState = nil
 	RunService:UnbindFromRenderStep("PhotoModeFlight")
+	restoreWallXray()
 	local camera = workspace.CurrentCamera
 	if camera then
 		local character = player.Character
@@ -232,7 +284,13 @@ UserInputService.InputBegan:Connect(function(input)
 	local shiftHeld = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 	if input.KeyCode == Enum.KeyCode.P and not shiftHeld and player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne" then
-		Remotes.PhotoMode:FireServer()
+		local state = flightState
+		if state then
+			local exitFrame = CFrame.new(state.position) * CFrame.fromOrientation(state.pitch, state.yaw, 0)
+			Remotes.PhotoMode:FireServer(false, exitFrame)
+		else
+			Remotes.PhotoMode:FireServer()
+		end
 	end
 end)
 
@@ -244,13 +302,14 @@ Remotes.PhotoMode.OnClientEvent:Connect(function(frozen: boolean)
 	player:SetAttribute("PhotoModeActive", frozen)
 	if frozen then
 		enableInspectionLighting()
+		enableWallXray()
 		startFlight()
 	else
 		stopFlight()
 		restoreGameplayLighting()
 	end
 	label.Text = if frozen
-		then "PHOTO FLIGHT  ·  WASD + mouse  ·  Space/E up  ·  Q/Ctrl down\nShift faster  ·  P return  ·  Clear lighting / graphics on"
+		then "PHOTO FLIGHT  ·  WASD + mouse  ·  Space/E up  ·  Q/Ctrl down\nShift faster  ·  Walls x-rayed  ·  P exit + move here"
 		else "Press P for Photo Mode / free flight"
 	label.TextColor3 = if frozen then Color3.fromRGB(190, 235, 245) else Color3.fromRGB(225, 235, 238)
 end)

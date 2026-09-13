@@ -16,6 +16,12 @@
       "StarterPlayerScripts": {
         "Lobby": {
           "$path": "lobby-src/StarterPlayer/StarterPlayerScripts/Lobby.client.luau"
+        },
+        "LobbyAudio": {
+          "$path": "lobby-src/StarterPlayer/StarterPlayerScripts/LobbyAudio.client.luau"
+        },
+        "LobbyWayfinding": {
+          "$path": "lobby-src/StarterPlayer/StarterPlayerScripts/LobbyWayfinding.client.luau"
         }
       }
     }

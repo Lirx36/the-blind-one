@@ -4,6 +4,7 @@
 -- it breathes while idle and no longer looks frozen while moving.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local V5Playback = require(game:GetService("ReplicatedStorage"):WaitForChild("BlindOneV5Playback"))
 
 type MotionState = {
 	phase: number,
@@ -12,6 +13,7 @@ type MotionState = {
 }
 
 local states: { [Motor6D]: MotionState } = {}
+local shellJointStates: { [Motor6D]: MotionState } = {}
 type LimpState = {
 	phase: number,
 	poses: { [Motor6D]: CFrame },
@@ -66,6 +68,20 @@ local function poseJoint(state: LimpState, joint: Motor6D?, target: CFrame, alph
 	-- procedural offset here makes every imported segment reliably follow it.
 	joint.Transform = CFrame.identity
 	joint.C0 = state.bases[joint] * current
+end
+
+local function poseShellJoint(joint: Motor6D?, target: CFrame, alpha: number)
+	if not joint then
+		return
+	end
+	local state = shellJointStates[joint]
+	if not state then
+		state = { phase = 0, transform = CFrame.identity, baseC0 = joint.C0 }
+		shellJointStates[joint] = state
+	end
+	state.transform = state.transform:Lerp(target, alpha)
+	joint.Transform = CFrame.identity
+	joint.C0 = state.baseC0 * state.transform
 end
 
 local function animateLimp(character: Model, humanoid: Humanoid, root: BasePart, dt: number, now: number, forcedSpeed: number?)
@@ -160,6 +176,10 @@ local function animateCharacter(character: Model, dt: number, now: number, force
 	if not visual or not humanoid or not root or not root:IsA("BasePart") then
 		return
 	end
+	if visual:IsA("Model") and visual:GetAttribute("SkinnedV5") == true then
+		V5Playback.Step(visual, root, dt, forcedSpeed)
+		return
+	end
 	if visual:GetAttribute("Articulated") == true then
 		animateLimp(character, humanoid, root, dt, now, forcedSpeed)
 		return
@@ -177,15 +197,18 @@ local function animateCharacter(character: Model, dt: number, now: number, force
 	end
 
 	local velocity = root.AssemblyLinearVelocity
-	local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-	local moving = horizontalSpeed > 0.75 and humanoid.MoveDirection.Magnitude > 0.05
+	local measuredSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	local horizontalSpeed = forcedSpeed or measuredSpeed
+	local moving = horizontalSpeed > 0.75 and (forcedSpeed ~= nil or humanoid.MoveDirection.Magnitude > 0.05)
 	local sprintWeight = math.clamp((horizontalSpeed - 10) / 8, 0, 1)
 	local target: CFrame
+	local step = 0
+	local injuredPlant = 0
 
 	if moving then
 		state.phase += dt * (3.35 + horizontalSpeed * 0.18)
-		local step = math.sin(state.phase)
-		local injuredPlant = math.max(0, step) ^ 2
+		step = math.sin(state.phase)
+		injuredPlant = math.max(0, step) ^ 2
 		local bob = math.abs(step) * 0.055 - injuredPlant * (0.19 + sprintWeight * 0.05)
 		local sway = step * 0.035 - injuredPlant * 0.12
 		local roll = math.rad(2) + injuredPlant * math.rad(9)
@@ -205,6 +228,27 @@ local function animateCharacter(character: Model, dt: number, now: number, force
 	state.transform = state.transform:Lerp(target, alpha)
 	motor.Transform = CFrame.identity
 	motor.C0 = state.baseC0 * state.transform
+
+	local leftSleeve = visual:FindFirstChild("V4LeftSleeveMotor", true)
+	local rightSleeve = visual:FindFirstChild("V4RightSleeveMotor", true)
+	local robe = visual:FindFirstChild("V4RobeMotor", true)
+	local lowerGait = visual:FindFirstChild("V4LowerGaitMotor", true)
+	if moving then
+		-- The healthy arm carries a wider counter-swing. The injured side hangs
+		-- heavy, while the robe and feet lag behind each uneven planted step.
+		poseShellJoint(leftSleeve :: Motor6D?, CFrame.Angles(-step * math.rad(15), 0, math.rad(-3)), alpha)
+		poseShellJoint(rightSleeve :: Motor6D?, CFrame.Angles(step * math.rad(7) + math.rad(4), 0, math.rad(6)), alpha)
+		poseShellJoint(robe :: Motor6D?, CFrame.new(step * 0.018, -injuredPlant * 0.035, 0)
+			* CFrame.Angles(-step * math.rad(1.8), 0, (step * 1.7 + injuredPlant * 3.2) * math.pi / 180), alpha)
+		poseShellJoint(lowerGait :: Motor6D?, CFrame.new(step * 0.025, -injuredPlant * 0.035, math.max(0, -step) * 0.045)
+			* CFrame.Angles((step * 3 - injuredPlant * 5) * math.pi / 180, 0, injuredPlant * math.rad(4)), alpha)
+	else
+		local breath = math.sin(now * 1.45)
+		poseShellJoint(leftSleeve :: Motor6D?, CFrame.Angles(math.rad(-2 + breath * 0.6), 0, math.rad(-3)), alpha)
+		poseShellJoint(rightSleeve :: Motor6D?, CFrame.Angles(math.rad(5 - breath * 0.5), 0, math.rad(6)), alpha)
+		poseShellJoint(robe :: Motor6D?, CFrame.Angles(0, 0, math.rad(breath * 0.35)), alpha)
+		poseShellJoint(lowerGait :: Motor6D?, CFrame.identity, alpha)
+	end
 end
 
 -- Roblox's Animator writes Motor6D.Transform before PreSimulation. Applying the
@@ -232,6 +276,11 @@ RunService.PreSimulation:Connect(function(dt)
 		suppressDefaultAnimations(aiMonster, true)
 		local visualSpeed = aiMonster:GetAttribute("VisualMoveSpeed")
 		animateCharacter(aiMonster, dt, now, if typeof(visualSpeed) == "number" then visualSpeed else 0)
+		local visual = aiMonster:FindFirstChild("BlindOneVisual")
+		local motor = visual and visual:FindFirstChild("BlindOneVisualMotor", true)
+		if motor and motor:IsA("Motor6D") then
+			seen[motor] = true
+		end
 	end
 
 	for motor in states do
@@ -261,6 +310,15 @@ RunService.PreSimulation:Connect(function(dt)
 				end
 			end
 			limpStates[character] = nil
+		end
+	end
+	for motor, state in shellJointStates do
+		if not motor.Parent then
+			shellJointStates[motor] = nil
+		elseif not motor:FindFirstAncestor("BlindOneVisual") then
+			motor.C0 = state.baseC0
+			motor.Transform = CFrame.identity
+			shellJointStates[motor] = nil
 		end
 	end
 	for animate, originalEnabled in disabledAnimateScripts do

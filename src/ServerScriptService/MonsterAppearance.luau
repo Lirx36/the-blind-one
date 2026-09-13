@@ -1,9 +1,11 @@
 --!strict
--- Roblox-native analog-horror appearance shared by the solo AI and the
--- player-controlled Blind One. It intentionally uses only Parts, WedgeParts,
--- native materials, lights, and welds: no Blender mesh or uploaded asset.
+-- Shared appearance for the solo AI and player-controlled Blind One. The V4
+-- Blender template is preferred when it exists in ServerStorage; the original
+-- Roblox-native appearance remains below as a safe fallback.
 -- The player's catalog avatar is hidden rather than destroyed so it can be
 -- restored if their role changes.
+
+local ServerStorage = game:GetService("ServerStorage")
 
 local MonsterAppearance = {}
 
@@ -570,9 +572,103 @@ local function addLimbDetails(visual: Model, character: Model)
 	end
 end
 
+local function addImportedV4(character: Model): boolean
+	-- Only activate V5 after its uploaded bones, scale and bind pose are verified.
+	local v5 = ServerStorage:FindFirstChild("BlindOneV5Template")
+	local useV5 = v5 ~= nil and v5:GetAttribute("IntegrationReady") == true
+	local template = if useV5 then v5 else ServerStorage:FindFirstChild("BlindOneV4Template")
+	local root = findPart(character, { "HumanoidRootPart" })
+	if not template or not template:IsA("Model") or not root then
+		return false
+	end
+
+	-- EditableMesh-backed preview content has no persistent MeshId and vanishes
+	-- for Play clients. Keep the native visual active until the V4 GLB has been
+	-- imported through Studio as real Roblox mesh assets.
+	local hasRuntimeMesh = false
+	for _, descendant in template:GetDescendants() do
+		if descendant:IsA("MeshPart") and descendant.MeshId ~= "" then
+			hasRuntimeMesh = true
+			break
+		end
+	end
+	if not hasRuntimeMesh then
+		return false
+	end
+
+	local visual = template:Clone()
+	visual.Name = VISUAL_NAME
+	visual:SetAttribute("Articulated", false)
+	visual:SetAttribute("DesignVersion", "V4BlenderGameplay")
+	visual:SetAttribute("SkinnedV5", useV5)
+	if useV5 then visual:SetAttribute("DesignVersion", "V5RiggedGameplay") end
+	visual:SetAttribute("UsesImportedAsset", true)
+	visual.Parent = character
+	visual:PivotTo(root.CFrame)
+
+	local anchor = visual:FindFirstChild("TemplateRoot")
+	if not anchor or not anchor:IsA("BasePart") then
+		visual:Destroy()
+		return false
+	end
+
+	anchor.Anchored = false
+	anchor.Massless = true
+	anchor.CanCollide = false
+	anchor.CanTouch = false
+	anchor.CanQuery = false
+	anchor.CastShadow = false
+
+	for _, descendant in visual:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant ~= anchor then
+			descendant.Anchored = false
+			descendant.Massless = true
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+			descendant.CanQuery = false
+
+			if useV5 then
+				-- Preserve the importer's Motor6D graph: shared bones live in
+				-- RootPart and skin the meshes through these connections.
+				-- WeldConstraint connections do not substitute for that graph.
+				if descendant.Name == "RootPart" then
+					local joint = Instance.new("Motor6D")
+					joint.Name = "V5SkeletonMount"
+					joint.Part0 = anchor
+					joint.Part1 = descendant
+					joint.C0 = anchor.CFrame:ToObjectSpace(descendant.CFrame)
+					joint.Parent = descendant
+				end
+				continue
+			end
+
+			-- This export batches skin, wraps and stitching by material, not limb.
+			-- Keep its original offsets together until a skinned rig replaces it.
+			local weld = Instance.new("WeldConstraint")
+			weld.Name = "V4VisualWeld"
+			weld.Part0 = anchor
+			weld.Part1 = descendant
+			weld.Parent = descendant
+		end
+	end
+
+	local motor = Instance.new("Motor6D")
+	motor.Name = "BlindOneVisualMotor"
+	motor.Part0 = root
+	motor.Part1 = anchor
+	motor.C0 = CFrame.identity
+	motor.C1 = CFrame.identity
+	motor.Parent = anchor
+	return true
+end
+
 function MonsterAppearance.Apply(character: Model)
 	MonsterAppearance.Clear(character)
 	hideAvatar(character)
+
+	if addImportedV4(character) then
+		return
+	end
 
 	local visual = Instance.new("Model")
 	visual.Name = VISUAL_NAME
@@ -600,7 +696,6 @@ function MonsterAppearance.Apply(character: Model)
 	end
 
 	addLimbDetails(visual, character)
-
 end
 
 return MonsterAppearance

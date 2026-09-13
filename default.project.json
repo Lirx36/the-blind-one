@@ -14,6 +14,15 @@
     "ServerScriptService": {
       "$path": "src/ServerScriptService"
     },
+    "ServerStorage": {
+      "BlindOneV5Template": {
+        "$path": "assets/blind-one-analog/v5-rig-review/BlindOneV5Template.rbxmx",
+        "$attributes": {
+          "IntegrationReady": true,
+          "MotionTranslationScale": 1
+        }
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {

@@ -9,5 +9,7 @@
 __pycache__/
 
 /build/
+.tools/
+assets/blind-one-analog/v4/roblox-payload/
 .DS_Store
 Thumbs.db

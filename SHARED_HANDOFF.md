@@ -422,3 +422,94 @@ death and respawn with no custom death screen or jumpscare.
   every building a flat grey silhouette.
 - Rojo build and `git diff --check` passed, producing
   `build/the-blind-one-hearing-fog-test.rbxlx`.
+
+## Blind One V4 Roblox comparison preview (2026-09-12)
+
+- Preserved `assets/blind-one-analog/v4/TheBlindOne_V4_Detail.blend`
+  byte-for-byte. Its SHA-256 is
+  `8CB9C6F007408BA9615681B041582B06F5D4FFD059B00A24267D210AAC044A63`.
+- Created separate optimized outputs:
+  `TheBlindOne_V4_RobloxPreview.blend`, `.glb`, and `.json`. The static
+  comparison contains 26 mesh pieces and 252,316 triangles total; no piece is
+  above 16,920 triangles.
+- Inserted the comparison through Roblox Studio MCP into the existing main
+  place only (`placeId: 121524238363010`) at
+  `Workspace.BlindOneV4ComparisonPreview`, positioned at `(350, 0, 0)` with a
+  labeled review pedestal and neutral review lights. The camera and Studio
+  selection point to the preview. No playtest was started.
+- This is a static appearance comparison made with session-scoped DataModel
+  mesh content because this Studio build reports that `CreateAssetAsync` is not
+  available yet. It is not the live rig, does not replace the current monster,
+  and has no collisions. Rigging and the final persistent asset import remain
+  gated on the user's visual approval.
+- User verdict: the Blender execution looks really good, but the character
+  design itself does not yet hit the intended direction. Preserve V4 and its
+  exports as a finished concept/reference. Do not rig, replace the live monster,
+  or delete this version unless the user later changes direction.
+
+### V4 gameplay promotion update (2026-09-13)
+
+- The user later selected the existing V4 Studio character as the gameplay
+  Blind One.
+- The main place now contains `ServerStorage.BlindOneV4Template`, a clean copy
+  of all 26 V4 mesh pieces aligned to the monster root. Both the solo AI and the
+  player-controlled Blind One receive this appearance through
+  `ServerScriptService.MonsterAppearance`.
+- The original comparison model and review pedestal remain untouched at
+  `Workspace.BlindOneV4ComparisonPreview`.
+- The previous native appearance remains as a runtime fallback and is backed up
+  at `ServerStorage.MonsterAppearanceLegacyNativeBackup`.
+- No playtest was started; the user remains the gameplay tester.
+
+### V4 root-alignment correction (2026-09-13)
+
+- The persistent GLB import used a feet-level scene pivot, which placed the
+  visual 3.9 studs above `HumanoidRootPart`. Lowered every gameplay template
+  mesh by 3.9 studs and recorded that offset in the import manifest.
+- Photo Mode intentionally freezes the AI Blind One while active; normal AI
+  movement resumes after leaving Photo Mode. No playtest was started.
+
+### Blind One navigation recovery and V4 limp (2026-09-13)
+
+- Maze navigation now follows the exact `MazeLayout` passage graph instead of
+  allowing navmesh paths to shave wall corners. Clear next-cell paths skip the
+  current cell centre, obstacle hits slide or sidestep, and stalled routes are
+  abandoned and recomputed instead of repeatedly pushing into one wall.
+- Fixed the V4 animator ignoring the AI's server-provided visual speed and then
+  resetting the AI visual motor during the same frame. The imported shell now
+  performs a smooth asymmetric limp with body drop and lurch.
+- Added independent runtime joints for both sleeves, the long robe and the
+  lower exposed mesh group. They counter-swing and drag during the limp rather
+  than remaining frozen while the entire character glides.
+- No playtest was started; the user remains the gameplay tester.
+
+### V4 Play-client visibility hotfix (2026-09-13)
+
+- A Play-session report confirmed that the V4 Blind One was absent in Photo
+  Mode. Inspection found local `MeshContent` on all V4 pieces but blank
+  `MeshId` values, so the MCP-created Edit-mode preview cannot replicate as a
+  persistent mesh asset to Play clients.
+- `MonsterAppearance` now checks the template for at least one persistent mesh
+  ID before cloning it. Until the GLB is imported and published through
+  Studio, both AI and player-controlled Blind Ones use the existing visible
+  native appearance instead of an invisible V4 shell.
+- The V4 preview, template, Blender source, and GLB remain preserved. No
+  playtest was started; the user remains the gameplay tester.
+
+### V4 persistent Studio import completed (2026-09-13)
+
+- The user imported `TheBlindOne_V4_RobloxPreview.glb` through Studio with
+  **Upload to Roblox** enabled. All 26 MeshParts now have persistent Roblox
+  mesh IDs and pass `MonsterAppearance`'s Play-client safety guard.
+- Rebuilt `ServerStorage.BlindOneV4Template` from that upload, using the dark
+  V4 cloth/binding/skin palette, stained ivory mask, black eye void and cold
+  Neon eyes with a restrained local glow. The grey Import Preview colors are
+  no longer used by the gameplay template.
+- Preserved the raw uploaded hierarchy at
+  `ServerStorage.BlindOneV4ImportedSource` and recorded all asset IDs and colors
+  in `assets/blind-one-analog/v4/RobloxImportedManifest.json`.
+- No playtest was started; the user remains the gameplay tester.
+
+## 2026-09-13 — V5 confirmed and preview archived
+User confirmed the repaired V5 limp and limb movement work naturally. Restored 26 imported Motor6D skinning connections and preserved them in MonsterAppearance. Archived the obsolete V4 display from Workspace to ServerStorage. Captured V5 as assets/blind-one-analog/v5-rig-review/BlindOneV5Template.rbxmx and included it in default.project.json. Main and lobby Rojo builds passed; user owns Play testing. Both AI and player roles use shared V5 playback.
+

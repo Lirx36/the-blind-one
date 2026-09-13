@@ -1,0 +1,23 @@
+{
+  "status": "persistently imported and selected as gameplay Blind One appearance",
+  "rigged": false,
+  "game_integrated": true,
+  "runtime_wired": true,
+  "runtime_visible": true,
+  "native_fallback_active": false,
+  "persistent_mesh_ids": 26,
+  "quality_approved": true,
+  "character_direction_selected": true,
+  "rigging_paused": false,
+  "comparison_preview_in_main_studio": true,
+  "comparison_path": "Workspace.BlindOneV4ComparisonPreview",
+  "current_monster_untouched": false,
+  "gameplay_template_path": "ServerStorage.BlindOneV4Template",
+  "imported_source_backup_path": "ServerStorage.BlindOneV4ImportedSource",
+  "legacy_backup_path": "ServerStorage.MonsterAppearanceLegacyNativeBackup",
+  "source": "preserved V3",
+  "source_sha256": "8CB9C6F007408BA9615681B041582B06F5D4FFD059B00A24267D210AAC044A63",
+  "export_meshes": 26,
+  "export_triangles": 252316,
+  "max_triangles_per_mesh": 16920
+}
