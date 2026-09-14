@@ -6,7 +6,7 @@
       "Remotes": {
         "$path": "src/ReplicatedStorage/Remotes.luau"
       },
-        "LobbyElevatorsV28": {
+        "LobbyElevatorsV30": {
         "$path": "lobby-src/ReplicatedStorage/LobbyElevators.luau"
       }
     },

@@ -112,7 +112,8 @@ RunService.Heartbeat:Connect(function(dt)
 		if st.meter < target then
 			st.meter = math.min(target, st.meter + Config.NoiseSmoothing * 3 * dt)
 		else
-			st.meter = math.max(target, st.meter - Config.NoiseSmoothing * dt)
+			local decayMultiplier = if st.move == "crouch" then Config.NoiseCrouchDecayMultiplier else 1
+			st.meter = math.max(target, st.meter - Config.NoiseSmoothing * decayMultiplier * dt)
 		end
 		player:SetAttribute("Noise", st.meter)
 
@@ -121,7 +122,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local interval = Config.FootstepInterval * (st.move == "sprint" and 0.6 or 1)
 			if now - st.lastStep >= interval then
 				st.lastStep = now
-				noiseEvent:Fire(hrp.Position, st.meter)
+				noiseEvent:Fire(hrp.Position, st.meter, player)
 			end
 		end
 	end

@@ -611,7 +611,7 @@ RunService.RenderStepped:Connect(function(dt)
 		else
 			title.Text = "YOU ARE A SURVIVOR"
 			title.TextColor3 = Color3.fromRGB(220, 235, 215)
-			hint.Text = "Hold Ctrl to crouch • Shift to sprint • E picks up rocks • Click throws them"
+			hint.Text = "Hold Ctrl to crouch • Shift to sprint • E picks up rocks • 1 equips them"
 			hint.TextColor3 = Color3.fromRGB(170, 195, 165)
 		end
 		task.spawn(playRoleReveal, isBlindOne)

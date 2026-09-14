@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
 
 local csModule = ReplicatedStorage:WaitForChild("ClientState", 5)
 local ClientState = (csModule and require(csModule)) or { stamina = 1 }
@@ -186,7 +187,7 @@ local controls = {
 	{ "CTRL", "CROUCH" },
 	{ "F", "FLASHLIGHT" },
 	{ "E", "INTERACT / PICK UP" },
-	{ "LMB", "THROW BALL" },
+	{ "1", "EQUIP ROCK" },
 }
 for index, control in controls do
 	local rowY = 38 + (index - 1) * 28
@@ -281,7 +282,7 @@ rockKey.Size = UDim2.fromOffset(19, 19)
 rockKey.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
 rockKey.BorderSizePixel = 0
 rockKey.Font = Enum.Font.GothamBold
-rockKey.Text = "1"
+rockKey.Text = if UserInputService.TouchEnabled then "TAP" else "1"
 rockKey.TextSize = 11
 rockKey.TextColor3 = Color3.fromRGB(238, 244, 246)
 rockKey.Parent = rockSlot
@@ -317,11 +318,52 @@ rockCount.TextXAlignment = Enum.TextXAlignment.Right
 rockCount.TextColor3 = Color3.fromRGB(237, 241, 239)
 rockCount.Parent = rockSlot
 
+local maxLabel = Instance.new("TextLabel")
+maxLabel.AnchorPoint = Vector2.new(0.5, 1)
+maxLabel.Position = UDim2.new(0.5, 0, 0, -5)
+maxLabel.Size = UDim2.fromOffset(86, 23)
+maxLabel.BackgroundTransparency = 1
+maxLabel.Font = Enum.Font.GothamBlack
+maxLabel.Text = "MAX"
+maxLabel.TextColor3 = Color3.fromRGB(239, 57, 43)
+maxLabel.TextSize = 17
+maxLabel.TextStrokeColor3 = Color3.fromRGB(15, 0, 0)
+maxLabel.TextStrokeTransparency = 0.18
+maxLabel.Visible = false
+maxLabel.Parent = rockSlot
+
+local equipButton = Instance.new("TextButton")
+equipButton.Name = "EquipRockButton"
+equipButton.Size = UDim2.fromScale(1, 1)
+equipButton.BackgroundTransparency = 1
+equipButton.TextTransparency = 1
+equipButton.ZIndex = 8
+equipButton.Parent = rockSlot
+
+if player:GetAttribute("BallEquipped") == nil then
+	player:SetAttribute("BallEquipped", false)
+end
+
+equipButton.Activated:Connect(function()
+	local heldValue = player:GetAttribute("HeldBalls")
+	local held = if typeof(heldValue) == "number" then heldValue else 0
+	if held <= 0 or player:GetAttribute("Role") == "BlindOne"
+		or player:GetAttribute("PhotoModeActive") == true or player:GetAttribute("RepairMinigameActive") == true then
+		player:SetAttribute("BallEquipped", false)
+		return
+	end
+	player:SetAttribute("BallEquipped", player:GetAttribute("BallEquipped") ~= true)
+end)
+
 local function setRockCount(value: number)
 	local count = math.max(0, math.floor(value))
 	rockCount.Text = ("x%d"):format(count)
 	rockIcon.BackgroundTransparency = if count > 0 then 0 else 0.65
 	rockCount.TextTransparency = if count > 0 then 0 else 0.5
+	maxLabel.Visible = count >= Config.MaxThrowables
+	if count <= 0 and player:GetAttribute("BallEquipped") == true then
+		player:SetAttribute("BallEquipped", false)
+	end
 end
 
 -- Three compact power indicators make the survivor agenda readable without
@@ -330,7 +372,7 @@ local progressPanel = Instance.new("Frame")
 progressPanel.Name = "GateProgress"
 progressPanel.AnchorPoint = Vector2.new(0.5, 0)
 progressPanel.Position = UDim2.new(0.5, 0, 0, 126)
-progressPanel.Size = UDim2.fromOffset(196, 30)
+progressPanel.Size = UDim2.fromOffset(238, 30)
 progressPanel.BackgroundColor3 = Color3.fromRGB(7, 10, 10)
 progressPanel.BackgroundTransparency = 0.30
 progressPanel.BorderSizePixel = 0
@@ -349,11 +391,11 @@ progressLabel.TextXAlignment = Enum.TextXAlignment.Left
 progressLabel.TextColor3 = Color3.fromRGB(161, 176, 171)
 progressLabel.Parent = progressPanel
 local progressPips: { Frame } = {}
-for index = 1, 3 do
+for index = 1, 5 do
 	local pip = Instance.new("Frame")
 	pip.Name = "Mechanism" .. index
-	pip.Position = UDim2.fromOffset(98 + (index - 1) * 29, 8)
-	pip.Size = UDim2.fromOffset(20, 14)
+	pip.Position = UDim2.fromOffset(96 + (index - 1) * 27, 8)
+	pip.Size = UDim2.fromOffset(19, 14)
 	pip.BackgroundColor3 = Color3.fromRGB(105, 35, 27)
 	pip.BorderSizePixel = 0
 	pip.Parent = progressPanel
@@ -363,7 +405,17 @@ for index = 1, 3 do
 	table.insert(progressPips, pip)
 end
 
-local generatedMap = workspace:WaitForChild("GeneratedMap")
+local generatedMap: Folder
+while true do
+	local candidate = workspace:FindFirstChild("GeneratedMap")
+	if candidate and candidate:IsA("Folder")
+		and candidate:GetAttribute("MapVersion") == "HollowLabyrinth_4_RandomGenerators"
+		and candidate:GetAttribute("Ready") == true then
+		generatedMap = candidate
+		break
+	end
+	task.wait(0.1)
+end
 local function refreshGateProgress()
 	local activeValue = generatedMap:GetAttribute("MechanismsActive")
 	local active = if typeof(activeValue) == "number" then activeValue else 0
@@ -440,6 +492,11 @@ RunService.RenderStepped:Connect(function()
 	panel.Visible = isSurvivor
 	controlsPanel.Visible = isSurvivor
 	rockSlot.Visible = isSurvivor
+	local ballEquipped = isSurvivor and player:GetAttribute("BallEquipped") == true
+	rockSlotStroke.Color = if ballEquipped then Color3.fromRGB(231, 91, 50) else Color3.fromRGB(132, 151, 157)
+	rockSlotStroke.Transparency = if ballEquipped then 0 else 0.35
+	rockSlotStroke.Thickness = if ballEquipped then 3 else 1
+	rockSlot.BackgroundColor3 = if ballEquipped then Color3.fromRGB(37, 16, 12) else Color3.fromRGB(8, 11, 14)
 	local heldValue = player:GetAttribute("HeldBalls")
 	if typeof(heldValue) == "number" then
 		setRockCount(heldValue)

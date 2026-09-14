@@ -5,6 +5,11 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+pcall(function()
+	-- The labyrinth owns its first-person camera, so Roblox's separate shift-lock
+	-- toggle must stay disabled.
+	player.DevEnableMouseLock = false
+end)
 local character: Model? = nil
 local humanoid: Humanoid? = nil
 local crouchAlpha = 0
@@ -101,7 +106,11 @@ local function lockCamera()
 end
 
 local function updateCameraMode()
-	if player:GetAttribute("InMatch") == true then
+	if player:GetAttribute("Spectating") == true then
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 12
+		player.CameraMaxZoomDistance = 12
+	elseif player:GetAttribute("InMatch") == true then
 		lockCamera()
 	else
 		player.CameraMode = Enum.CameraMode.Classic
@@ -162,6 +171,13 @@ local function setCharacter(nextCharacter: Model)
 	descendantRemovingConnection = nextCharacter.DescendantRemoving:Connect(forgetDescendant)
 
 	nextHumanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
+	if player:GetAttribute("Spectating") ~= true then
+		local camera = workspace.CurrentCamera
+		if camera then
+			camera.CameraSubject = nextHumanoid
+			camera.CameraType = Enum.CameraType.Custom
+		end
+	end
 	updateCameraMode()
 end
 
@@ -218,6 +234,7 @@ player:GetAttributeChangedSignal("InMatch"):Connect(function()
 		humanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
 	end
 end)
+player:GetAttributeChangedSignal("Spectating"):Connect(updateCameraMode)
 
 -- Run after Roblox's camera transparency pass and touch only the cached lower-body
 -- parts. This is a small, constant amount of work per rendered frame.
@@ -227,7 +244,7 @@ RunService:BindToRenderStep("FirstPersonLowerBody", Enum.RenderPriority.Camera.V
 	if not currentCharacter or not currentHumanoid or currentHumanoid.Health <= 0 then
 		return
 	end
-	if player:GetAttribute("InMatch") ~= true then
+	if player:GetAttribute("InMatch") ~= true or player:GetAttribute("Spectating") == true then
 		currentHumanoid.CameraOffset = Vector3.zero
 		for part in visibleParts do
 			if part.Parent then part.LocalTransparencyModifier = 0 end
@@ -272,7 +289,10 @@ RunService.PreSimulation:Connect(function()
 		setCrouchPose(0)
 		poseApplied = false
 	end
-	if player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then
+	if player:GetAttribute("InMatch") == true
+		and player:GetAttribute("Role") ~= "BlindOne"
+		and player:GetAttribute("PhotoModeActive") ~= true
+		and player:GetAttribute("Spectating") ~= true then
 		setFlashlightArmPose()
 		flashlightPoseApplied = true
 	elseif flashlightPoseApplied then

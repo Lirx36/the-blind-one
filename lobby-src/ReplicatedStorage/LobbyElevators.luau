@@ -7,9 +7,10 @@ local ServerStorage = game:GetService("ServerStorage")
 local LobbyElevators = {}
 
 LobbyElevators.DOOR_TIME = 0.8
+LobbyElevators.DEPARTURE_TIME = 2.4
 
 local ROOT_NAME = "QueueElevators"
-local BUILD_VERSION = 28
+local BUILD_VERSION = 30
 local BUNKER_NAME = "BunkerLobby"
 
 local PRIVATE = {
@@ -246,12 +247,26 @@ local function addPrivateRig(root: Folder, bunker: Instance, config)
 	local cabinCenterX = x + direction * 14
 	local dark = Color3.fromRGB(23, 28, 30)
 	local wall = Color3.fromRGB(48, 56, 59)
+	local shaft = Color3.fromRGB(7, 10, 12)
 	local floor = part(rig, "CabinFloor", Vector3.new(28, 0.45, 16), CFrame.new(cabinCenterX, 421.15, z), Color3.fromRGB(42, 49, 52), Enum.Material.DiamondPlate)
 	floor.CanCollide = true
 	part(rig, "CabinCeiling", Vector3.new(28, 0.4, 16), CFrame.new(cabinCenterX, 436.05, z), dark, Enum.Material.Metal)
 	part(rig, "BackWall", Vector3.new(0.5, 14.8, 16), CFrame.new(x + direction * 27.75, 428.6, z), wall, Enum.Material.Concrete)
 	part(rig, "SideWallA", Vector3.new(28, 14.8, 0.45), CFrame.new(cabinCenterX, 428.6, z - 7.75), wall, Enum.Material.Concrete)
 	part(rig, "SideWallB", Vector3.new(28, 14.8, 0.45), CFrame.new(cabinCenterX, 428.6, z + 7.75), wall, Enum.Material.Concrete)
+	-- A full-height stationary shaft remains after the car drops. Its shell sits
+	-- just outside the cabin, so it is invisible normally and seals every void
+	-- angle during the departure shot.
+	local shaftBack = part(rig, "DepartureShaftBack", Vector3.new(0.7, 64, 17.2), CFrame.new(x + direction * 28.2, 410, z), shaft, Enum.Material.DiamondPlate)
+	local shaftSideA = part(rig, "DepartureShaftSide", Vector3.new(29, 64, 0.7), CFrame.new(cabinCenterX, 410, z - 8.2), shaft, Enum.Material.DiamondPlate)
+	local shaftSideB = part(rig, "DepartureShaftSide", Vector3.new(29, 64, 0.7), CFrame.new(cabinCenterX, 410, z + 8.2), shaft, Enum.Material.DiamondPlate)
+	local shaftBottom = part(rig, "DepartureShaftBottom", Vector3.new(29, 0.7, 17.2), CFrame.new(cabinCenterX, 378.2, z), shaft, Enum.Material.Metal)
+	local shaftTop = part(rig, "DepartureShaftTop", Vector3.new(29, 0.7, 17.2), CFrame.new(cabinCenterX, 441.8, z), shaft, Enum.Material.Metal)
+	for _, shellPart in ipairs({ shaftBack, shaftSideA, shaftSideB, shaftBottom, shaftTop }) do shellPart.CanCollide = false end
+	for _, guideZ in ipairs({ -4.6, 4.6 }) do
+		local guide = part(rig, "DepartureShaftGuide", Vector3.new(0.18, 59, 0.28), CFrame.new(x + direction * 27.78, 408.8, z + guideZ), config.color:Lerp(shaft, 0.58), Enum.Material.Metal)
+		guide.CanCollide = false
+	end
 	local jambColor = Color3.fromRGB(24, 29, 31)
 	part(rig, "DoorJambTop", Vector3.new(1.6, 0.8, 11.1), CFrame.new(x - direction * 0.15, 435.1, z), jambColor, Enum.Material.DiamondPlate)
 	part(rig, "DoorJambLeft", Vector3.new(1.6, 14.4, 1.05), CFrame.new(x - direction * 0.15, 428.15, z - 5.05), jambColor, Enum.Material.DiamondPlate)
@@ -447,12 +462,23 @@ local function addPublicRig(root: Folder, bunker: Instance)
 	local accent = Color3.fromRGB(177, 39, 33)
 	local dark = Color3.fromRGB(24, 25, 25)
 	local wall = Color3.fromRGB(42, 49, 51)
+	local shaft = Color3.fromRGB(7, 10, 12)
 
 	part(rig, "CabinFloor", Vector3.new(44, 0.5, 34), CFrame.new(0, 421.8, 100.6), Color3.fromRGB(31, 36, 39), Enum.Material.DiamondPlate)
 	part(rig, "CabinCeiling", Vector3.new(44, 0.45, 34), CFrame.new(0, 440.55, 100.6), dark, Enum.Material.Metal)
 	part(rig, "BackWall", Vector3.new(44, 18.5, 0.55), CFrame.new(0, 431.2, 117.35), wall, Enum.Material.Metal)
 	part(rig, "SideWallA", Vector3.new(0.55, 18.5, 34), CFrame.new(-21.75, 431.2, 100.6), wall, Enum.Material.Metal)
 	part(rig, "SideWallB", Vector3.new(0.55, 18.5, 34), CFrame.new(21.75, 431.2, 100.6), wall, Enum.Material.Metal)
+	local shaftBack = part(rig, "DepartureShaftBack", Vector3.new(46, 66, 0.7), CFrame.new(0, 410, 117.82), shaft, Enum.Material.DiamondPlate)
+	local shaftSideA = part(rig, "DepartureShaftSide", Vector3.new(0.7, 66, 35.5), CFrame.new(-22.25, 410, 100.6), shaft, Enum.Material.DiamondPlate)
+	local shaftSideB = part(rig, "DepartureShaftSide", Vector3.new(0.7, 66, 35.5), CFrame.new(22.25, 410, 100.6), shaft, Enum.Material.DiamondPlate)
+	local shaftBottom = part(rig, "DepartureShaftBottom", Vector3.new(46, 0.7, 35.5), CFrame.new(0, 377.3, 100.6), shaft, Enum.Material.Metal)
+	local shaftTop = part(rig, "DepartureShaftTop", Vector3.new(46, 0.7, 35.5), CFrame.new(0, 442.7, 100.6), shaft, Enum.Material.Metal)
+	for _, shellPart in ipairs({ shaftBack, shaftSideA, shaftSideB, shaftBottom, shaftTop }) do shellPart.CanCollide = false end
+	for _, guideX in ipairs({ -15, 0, 15 }) do
+		local guide = part(rig, "DepartureShaftGuide", Vector3.new(0.28, 61, 0.18), CFrame.new(guideX, 408.5, 117.43), accent:Lerp(shaft, 0.62), Enum.Material.Metal)
+		guide.CanCollide = false
+	end
 
 	for x = -16, 16, 8 do
 		local guide = part(rig, "FreightGuide", Vector3.new(0.12, 0.06, 30), CFrame.new(x, 422.08, 100.6), accent, Enum.Material.Neon)
@@ -656,6 +682,61 @@ function LobbyElevators.CloseAll(instant: boolean?)
 	for _, queueId in ipairs({ "Private1", "Private2", "Private3", "Private4", "Public" }) do
 		LobbyElevators.SetOpen(queueId, false, instant)
 	end
+end
+
+local STATIC_DEPARTURE_PARTS = {
+	EntryPoint = true,
+	ExitPoint = true,
+	CameraPoint = true,
+	OccupantBarrier = true,
+	DoorJambTop = true,
+	DoorJambLeft = true,
+	DoorJambRight = true,
+	DoorHeaderSeal = true,
+	UpperHeaderBulkhead = true,
+	HeaderSignBackbox = true,
+	HeaderUndersideAccent = true,
+	DoorPocketLeft = true,
+	DoorPocketRight = true,
+	DoorPocketEdge = true,
+	DoorThreshold = true,
+	FreightHeaderSeal = true,
+	FreightHeaderAccent = true,
+	FreightHeaderSignBackbox = true,
+	FreightDoorPocketLeft = true,
+	FreightDoorPocketRight = true,
+	FreightPocketEdge = true,
+	DepartureShaftBack = true,
+	DepartureShaftSide = true,
+	DepartureShaftBottom = true,
+	DepartureShaftTop = true,
+	DepartureShaftGuide = true,
+}
+
+function LobbyElevators.BeginDeparture(queueId: string): number
+	local rig = rigFor(queueId)
+	if not rig or rig:GetAttribute("Departing") == true then return 0 end
+	rig:SetAttribute("Departing", true)
+	for _, item in ipairs(rig:GetDescendants()) do
+		if not item:IsA("BasePart") or STATIC_DEPARTURE_PARTS[item.Name] then continue end
+		if item:GetAttribute("DepartureRestCFrame") == nil then item:SetAttribute("DepartureRestCFrame", item.CFrame) end
+		TweenService:Create(item, TweenInfo.new(LobbyElevators.DEPARTURE_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+			CFrame = item.CFrame - Vector3.new(0, 34, 0),
+		}):Play()
+	end
+	return LobbyElevators.DEPARTURE_TIME
+end
+
+function LobbyElevators.ResetDeparture(queueId: string)
+	local rig = rigFor(queueId)
+	if not rig then return end
+	for _, item in ipairs(rig:GetDescendants()) do
+		if not item:IsA("BasePart") then continue end
+		local rest = item:GetAttribute("DepartureRestCFrame")
+		if typeof(rest) == "CFrame" then item.CFrame = rest end
+	end
+	rig:SetAttribute("Departing", false)
+	LobbyElevators.SetOpen(queueId, false, true)
 end
 
 function LobbyElevators.MoveInside(queueId: string, character: Model, slotIndex: number?): boolean

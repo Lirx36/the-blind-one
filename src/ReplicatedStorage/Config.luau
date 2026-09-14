@@ -17,6 +17,7 @@ return {
 	NoiseSprint = 78,
 	NoiseIdle = 0,
 	NoiseSmoothing = 6, -- how fast the meter chases its target, per second
+	NoiseCrouchDecayMultiplier = 3, -- crouching sheds existing noise three times faster
 	FootstepInterval = 0.45, -- seconds between positional footstep blips while moving
 	NoiseCarry = 1.7, -- studs of travel per point of loudness
 	DoorNoise = 55,
@@ -28,18 +29,24 @@ return {
 	MonsterInvestigateSpeed = 14,
 	MonsterHuntSpeed = 19, -- just under SprintSpeed: sprinting CAN break line, but it screams your position
 	MonsterCatchDistance = 5.5,
-	MonsterHearingFloor = 6, -- effective loudness below this is not registered
+	MonsterHearingFloor = 4, -- crouching stays below this threshold
+	BotNoiseCarry = 4, -- bot hears normal walking at about 80 studs
+	BotHearingRange = 300, -- cap for sprinting, objectives and impact sounds
+	BotTargetCommitTime = 2, -- resist marginal target changes after selection
+	BotTargetSwitchMargin = 8, -- another sound must be clearly stronger
+	BotSoundMemory = 60, -- allow time to traverse winding routes to distant noise
 	MonsterInvestigateTime = 6, -- seconds it searches a heard spot before losing interest
 	MonsterHuntGrace = 2.5, -- seconds of silence before HUNT downgrades to INVESTIGATE
 	MonsterRepath = 0.35, -- seconds between path recomputes
 	MonsterHuntNoise = 42, -- heard loudness at short range that escalates INVESTIGATE -> HUNT
-	MonsterHuntRange = 22, -- ...within this distance
+	MonsterHuntRange = 85, -- loud nearby survivors trigger a faster pursuit
 	PlayerBlindOneEnabled = true, -- with 2+ players, one player replaces the AI
 	PlayerBlindOneSpeed = 19,
 
 	-- ---- round ----
-	StudioSafeMode = true, -- in Studio the monster can chase, but cannot kill players
+	StudioSafeMode = false, -- allow Studio playtests to trigger death, jumpscares, and recovery UI
 	RespawnDelay = 3,
+	MaxRespawns = 3, -- manual returns offered by the casualty terminal
 	SpawnGrace = 3, -- seconds of immunity right after (re)spawning
 	StartThrowables = 3,
 	MaxThrowables = 4,

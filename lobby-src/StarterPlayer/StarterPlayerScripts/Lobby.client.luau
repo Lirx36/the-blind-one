@@ -5,6 +5,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local TeleportService = game:GetService("TeleportService")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 local player = Players.LocalPlayer
@@ -443,6 +446,9 @@ if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal
 
 local currentState: any = nil
 local currentQueue: any = nil
+local departureActive = false
+local suspendedGuis: { [ScreenGui]: boolean } = {}
+local departureGuiAddedConnection: RBXScriptConnection? = nil
 local activeAccent = Color3.fromRGB(90, 205, 219)
 local portraitCache: { [number]: string } = {}
 local portraitGeneration = 0
@@ -451,12 +457,51 @@ local function setSelected(target: TextButton, selected: boolean)
 	target.TextColor3 = if selected then Color3.fromRGB(246, 250, 247) else Color3.fromRGB(157, 174, 174)
 end
 
+local function setDepartureMode(active: boolean)
+	if departureActive == active then return end
+	departureActive = active
+	if active then
+		local function suspend(item: Instance)
+			if not item:IsA("ScreenGui") or suspendedGuis[item] ~= nil then return end
+			suspendedGuis[item] = item.Enabled
+			item.Enabled = false
+		end
+		for _, item in ipairs(player.PlayerGui:GetChildren()) do
+			suspend(item)
+		end
+		departureGuiAddedConnection = player.PlayerGui.ChildAdded:Connect(function(item) task.defer(suspend, item) end)
+		ProximityPromptService.Enabled = false
+		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false) end)
+		UserInputService.MouseIconEnabled = false
+		local transferGui = Instance.new("ScreenGui")
+		transferGui.Name = "DescentTransfer"
+		transferGui.IgnoreGuiInset = true
+		transferGui.DisplayOrder = 10000
+		local black = Instance.new("Frame")
+		black.Size = UDim2.fromScale(1, 1)
+		black.BackgroundColor3 = Color3.new()
+		black.BorderSizePixel = 0
+		black.Parent = transferGui
+		pcall(function() TeleportService:SetTeleportGui(transferGui) end)
+	else
+		if departureGuiAddedConnection then departureGuiAddedConnection:Disconnect() departureGuiAddedConnection = nil end
+		for screenGui, wasEnabled in suspendedGuis do
+			if screenGui.Parent then screenGui.Enabled = wasEnabled end
+		end
+		table.clear(suspendedGuis)
+		ProximityPromptService.Enabled = true
+		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true) end)
+		UserInputService.MouseIconEnabled = true
+	end
+end
+
 local function updateElevatorPortraits(queue: any)
 	portraitGeneration += 1
 	local generation = portraitGeneration
 	elevatorOverlay.Visible = queue ~= nil
 	if not queue then return end
 	descentReadout.Text = if queue.countdown then tostring(queue.countdown)
+		elseif queue.soloForced then "SOLO DESCENT  //  BOT REQUIRED"
 		elseif queue.kind == "Private" then ("PRIVATE BALLOT  //  BOT %d   PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
 		else ("PUBLIC BALLOT  //  BOT %d   PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
 	descentReadout.TextColor3 = activeAccent:Lerp(Color3.new(1, 1, 1), 0.32)
@@ -490,14 +535,16 @@ end
 
 local function updateQueue(queue: any)
 	currentQueue = queue
-	panel.Visible = queue ~= nil
-	panelShadow.Visible = queue ~= nil
+	setDepartureMode(queue ~= nil and queue.launching == true)
+	panel.Visible = queue ~= nil and not departureActive
+	panelShadow.Visible = queue ~= nil and not departureActive
 	if not queue then
 		updateElevatorPortraits(nil)
 		return
 	end
 	local isPrivate = queue.kind == "Private"
 	local isHost = queue.ownerUserId == player.UserId
+	local isSolo = isPrivate and queue.soloForced == true
 	local accentByQueue = {
 		Private1 = Color3.fromRGB(211, 107, 190),
 		Private2 = Color3.fromRGB(229, 152, 76),
@@ -507,6 +554,7 @@ local function updateQueue(queue: any)
 	}
 	activeAccent = accentByQueue[queue.id] or Color3.fromRGB(90, 205, 219)
 	updateElevatorPortraits(queue)
+	elevatorOverlay.Visible = not departureActive
 	panelEyebrow.Text = if isPrivate then "SECURE MATCH TERMINAL  //  PARTY BALLOT" else "PUBLIC MATCH TERMINAL  //  LIVE BALLOT"
 	panelStroke.Color = activeAccent
 	headerGlow.BackgroundColor3 = activeAccent
@@ -520,6 +568,7 @@ local function updateQueue(queue: any)
 	local queueNumber = tostring(queue.id):match("%d+") or ""
 	panelTitle.Text = if isPrivate then "PRIVATE ELEVATOR " .. string.format("%02d", tonumber(queueNumber) or 0) else "PUBLIC FREIGHT ELEVATOR"
 	panelStatus.Text = if queue.countdown then ("The descent begins in %d seconds..."):format(queue.countdown)
+		elseif isSolo then "Solo protocol active. The Blind One is locked to BOT."
 		elseif isPrivate and isHost then "Party ballot active. Begin the descent when ready."
 		elseif isPrivate then "Cast your vote. The host controls departure."
 		else ("Public vote: BOT %d  //  PLAYER %d"):format(queue.botVotes or 0, queue.playerVotes or 0)
@@ -534,16 +583,23 @@ local function updateQueue(queue: any)
 	modeTitle.Visible = true
 	modeHint.Visible = true
 	bot.Visible, human.Visible = true, true
-	modeTitle.Text = "THE BLIND ONE  //  PARTY VOTE"
+	modeTitle.Text = if isSolo then "THE BLIND ONE  //  SOLO PROTOCOL" else "THE BLIND ONE  //  PARTY VOTE"
 	local botVotes = queue.botVotes or 0
 	local playerVotes = queue.playerVotes or 0
-	modeHint.Text = if botVotes == playerVotes then "DEADLOCK  //  RANDOM ON DESCENT"
+	modeHint.Text = if isSolo then "BOT REQUIRED  //  PLAYER LOCKED"
+		elseif botVotes == playerVotes then "DEADLOCK  //  RANDOM ON DESCENT"
 		elseif botVotes > playerVotes then ("BOT MAJORITY  //  +%d"):format(botVotes - playerVotes)
 		else ("PLAYER MAJORITY  //  +%d"):format(playerVotes - botVotes)
-	bot.Text = ("◉  BOT  •  %d"):format(botVotes)
-	human.Text = ("♟  PLAYER  •  %d"):format(playerVotes)
-	setSelected(bot, queue.myVote == "Bot")
-	setSelected(human, queue.myVote == "Player")
+	bot.Text = if isSolo then "◉  BOT  •  FORCED" else ("◉  BOT  •  %d"):format(botVotes)
+	human.Text = if isSolo then "⊘  PLAYER  •  LOCKED" else ("♟  PLAYER  •  %d"):format(playerVotes)
+	human.Active = not isSolo
+	human.AutoButtonColor = not isSolo
+	setSelected(bot, isSolo or queue.myVote == "Bot")
+	setSelected(human, not isSolo and queue.myVote == "Player")
+	if isSolo then
+		human.BackgroundColor3 = Color3.fromRGB(8, 11, 12)
+		human.TextColor3 = Color3.fromRGB(69, 80, 82)
+	end
 	local totalVotes = math.max(botVotes + playerVotes, 1)
 	botVoteFill.Size = UDim2.fromScale(botVotes / totalVotes, 1)
 	playerVoteFill.Size = UDim2.fromScale(playerVotes / totalVotes, 1)
@@ -588,13 +644,13 @@ start.Activated:Connect(function() actionRemote:FireServer("Start") end)
 Remotes.LobbyState.OnClientEvent:Connect(function(state: any)
 	currentState = state
 	local phase = state.phase
-	menuShade.Visible = phase == "Menu"
-	hubHint.Visible = phase == "Hub" and state.queue == nil
 	updateQueue(state.queue)
+	menuShade.Visible = phase == "Menu" and not departureActive
+	hubHint.Visible = phase == "Hub" and state.queue == nil and not departureActive
 	if phase == "Match" then
 		gui.Enabled = false
 	end
-	UserInputService.MouseIconEnabled = phase ~= "Match"
+	UserInputService.MouseIconEnabled = phase ~= "Match" and not departureActive
 end)
 
 local cameraRestored = false

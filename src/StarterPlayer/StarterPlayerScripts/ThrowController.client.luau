@@ -1,5 +1,6 @@
 --!strict
--- E: pick up a nearby rock.  Left click / R2: throw one where you're looking.
+-- E picks up a nearby rock. Slot 1 toggles equip; only an equipped rock can be
+-- thrown. Touch players get a dedicated button so looking around never throws.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -11,6 +12,40 @@ local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
 
 local player = Players.LocalPlayer
 local PICKUP_RANGE = 12
+
+if player:GetAttribute("BallEquipped") == nil then
+	player:SetAttribute("BallEquipped", false)
+end
+
+local touchGui = Instance.new("ScreenGui")
+touchGui.Name = "TouchRockThrow"
+touchGui.IgnoreGuiInset = true
+touchGui.ResetOnSpawn = false
+touchGui.DisplayOrder = 120
+touchGui.Parent = player:WaitForChild("PlayerGui")
+local throwButton = Instance.new("TextButton")
+throwButton.Name = "ThrowButton"
+throwButton.AnchorPoint = Vector2.new(1, 1)
+throwButton.Position = UDim2.new(1, -32, 1, -132)
+throwButton.Size = UDim2.fromOffset(112, 64)
+throwButton.BackgroundColor3 = Color3.fromRGB(49, 20, 15)
+throwButton.BackgroundTransparency = 0.08
+throwButton.BorderSizePixel = 0
+throwButton.AutoButtonColor = false
+throwButton.Font = Enum.Font.GothamBlack
+throwButton.Text = "THROW"
+throwButton.TextColor3 = Color3.fromRGB(241, 218, 198)
+throwButton.TextSize = 16
+throwButton.Visible = false
+throwButton.Parent = touchGui
+local throwCorner = Instance.new("UICorner")
+throwCorner.CornerRadius = UDim.new(0, 11)
+throwCorner.Parent = throwButton
+local throwStroke = Instance.new("UIStroke")
+throwStroke.Color = Color3.fromRGB(229, 79, 44)
+throwStroke.Thickness = 2
+throwStroke.Transparency = 0.1
+throwStroke.Parent = throwButton
 
 local pickupOutline = Instance.new("Highlight")
 pickupOutline.Name = "LocalBallPickupOutline"
@@ -78,28 +113,69 @@ local function lookedAtRock(): BasePart?
 	return nil
 end
 
+local function heldCount(): number
+	local value = player:GetAttribute("HeldBalls")
+	return if typeof(value) == "number" then value else 0
+end
+
+local function canUseRock(): boolean
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	return player:GetAttribute("InMatch") == true
+		and player:GetAttribute("Role") ~= "BlindOne"
+		and player:GetAttribute("PhotoModeActive") ~= true
+		and player:GetAttribute("RepairMinigameActive") ~= true
+		and humanoid ~= nil and humanoid.Health > 0
+		and heldCount() > 0
+end
+
+local function toggleEquipped()
+	if not canUseRock() then
+		player:SetAttribute("BallEquipped", false)
+		return
+	end
+	player:SetAttribute("BallEquipped", player:GetAttribute("BallEquipped") ~= true)
+end
+
+local function throwEquipped()
+	if not canUseRock() or player:GetAttribute("BallEquipped") ~= true then return end
+	local camera = Workspace.CurrentCamera
+	if camera then Remotes.Throw:FireServer(camera.CFrame.LookVector) end
+end
+
 RunService.RenderStepped:Connect(function()
 	local target = if player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then lookedAtRock() else nil
 	pickupOutline.Adornee = target
 	pickupOutline.Enabled = target ~= nil
 	pickupBillboard.Adornee = target
 	pickupBillboard.Enabled = target ~= nil
+	if not canUseRock() and player:GetAttribute("BallEquipped") == true then
+		player:SetAttribute("BallEquipped", false)
+	end
+	throwButton.Visible = UserInputService.TouchEnabled and canUseRock() and player:GetAttribute("BallEquipped") == true
+end)
+
+throwButton.Activated:Connect(throwEquipped)
+player.CharacterAdded:Connect(function()
+	player:SetAttribute("BallEquipped", false)
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true then
+	if gpe or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("PhotoModeActive") == true
+		or player:GetAttribute("RepairMinigameActive") == true then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+	if input.KeyCode == Enum.KeyCode.One or input.KeyCode == Enum.KeyCode.ButtonL1 then
+		toggleEquipped()
+	elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
 		local rock = lookedAtRock()
 		local camera = Workspace.CurrentCamera
 		if rock and camera then
 			Remotes.Pickup:FireServer(rock, camera.CFrame.Position, camera.CFrame.LookVector)
 		end
-	elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonR2 then
-		local cam = Workspace.CurrentCamera
-		if cam then
-			Remotes.Throw:FireServer(cam.CFrame.LookVector)
-		end
+	elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
+		throwEquipped()
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not UserInputService.TouchEnabled then
+		throwEquipped()
 	end
 end)

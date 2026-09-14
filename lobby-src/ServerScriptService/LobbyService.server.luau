@@ -6,15 +6,17 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes"))
-local LobbyElevators = require(ReplicatedStorage:WaitForChild("LobbyElevatorsV28"))
+local LobbyElevators = require(ReplicatedStorage:WaitForChild("LobbyElevatorsV30"))
 local actionRemote = Remotes.LobbyAction
 local stateRemote = Remotes.LobbyState
 
 local ORIGIN = Vector3.new(0, 420, 0)
-local GAME_PLACE_ID = 121524238363010
-local PRIVATE_CAPACITY_MIN = 2
+local GAME_PLACE_ID = 88782261737370
+local PRIVATE_CAPACITY_MIN = 1
 local PRIVATE_CAPACITY_MAX = 6
 local PUBLIC_CAPACITY = 10
 local PUBLIC_COUNTDOWN = 15
@@ -145,7 +147,8 @@ local function updateWorldLabel(queue: Queue)
 		local access = if queue.friendsOnly then "FRIENDS ONLY" else "OPEN PARTY"
 		local botVotes, playerVotes = voteCounts(queue)
 		queue.label.Text = if queue.ownerUserId then
-			("%d/%d  •  %s  •  VOTE B%d / P%d"):format(count, queue.capacity, access, botVotes, playerVotes)
+			if queue.capacity == 1 then "1/1  •  SOLO PROTOCOL  •  BOT REQUIRED"
+			else ("%d/%d  •  %s  •  VOTE B%d / P%d"):format(count, queue.capacity, access, botVotes, playerVotes)
 			else "EMPTY  •  ENTER TO HOST"
 	end
 end
@@ -176,7 +179,9 @@ local function stateFor(player: Player)
 			myVote = queue.votes[player],
 			botVotes = botVotes,
 			playerVotes = playerVotes,
+			soloForced = queue.kind == "Private" and queue.capacity == 1,
 			countdown = queue.countdown,
+			launching = queue.launching,
 			members = members,
 		}
 	end
@@ -210,7 +215,8 @@ end
 local function removeFromQueue(player: Player)
 	local queue = playerQueue[player]
 	if not queue then return end
-	LobbyElevators.MoveOutside(queue.id, player.Character)
+	local wasLaunching = queue.launching
+	if not wasLaunching then LobbyElevators.MoveOutside(queue.id, player.Character) end
 	queue.members[player] = nil
 	queue.votes[player] = nil
 	playerQueue[player] = nil
@@ -229,9 +235,15 @@ local function removeFromQueue(player: Player)
 			queue.capacity = 4
 			queue.friendsOnly = true
 		end
+		if wasLaunching then
+			queue.launching = false
+			LobbyElevators.ResetDeparture(queue.id)
+		end
 	end
-	LobbyElevators.SetOpen(queue.id, queueCount(queue) > 0)
-	task.defer(placeQueueMembers, queue)
+	if not wasLaunching then
+		LobbyElevators.SetOpen(queue.id, queueCount(queue) > 0)
+		task.defer(placeQueueMembers, queue)
+	end
 	broadcast()
 end
 
@@ -270,7 +282,7 @@ end
 
 local function launch(queue: Queue)
 	if queue.launching or queueCount(queue) == 0 then return end
-	queue.blindMode = resolveVote(queue)
+	queue.blindMode = if queue.kind == "Private" and queue.capacity == 1 then "Bot" else resolveVote(queue)
 	if queue.blindMode == "Player" and queueCount(queue) < 2 then return end
 	queue.launching = true
 	broadcast()
@@ -278,20 +290,45 @@ local function launch(queue: Queue)
 	task.wait(LobbyElevators.DOOR_TIME + 0.08)
 	local party = {}
 	for member in queue.members do if member.Parent == Players then table.insert(party, member) end end
+	local partyUserIds = {}
+	for _, member in ipairs(party) do table.insert(partyUserIds, member.UserId) end
+	LobbyElevators.BeginDeparture(queue.id)
+	for _, member in ipairs(party) do
+		local root = member.Character and member.Character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			root.Anchored = true
+			TweenService:Create(root, TweenInfo.new(LobbyElevators.DEPARTURE_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+				CFrame = root.CFrame - Vector3.new(0, 34, 0),
+			}):Play()
+		end
+	end
 	if RunService:IsStudio() then
+		task.wait(LobbyElevators.DEPARTURE_TIME + 0.25)
 		queue.launching = false
 		queue.countdown = nil
+		LobbyElevators.ResetDeparture(queue.id)
 		LobbyElevators.SetOpen(queue.id, true)
+		placeQueueMembers(queue)
 		broadcast()
 		return
 	end
+	task.wait(0.35)
 	local options = Instance.new("TeleportOptions")
 	options.ShouldReserveServer = true
-	options:SetTeleportData({ DirectMatch = true, BlindOneMode = queue.blindMode })
+	options:SetTeleportData({
+		DirectMatch = true,
+		BlindOneMode = queue.blindMode,
+		ExpectedPlayers = #party,
+		PartyUserIds = partyUserIds,
+		ElevatorQueueId = queue.id,
+		TransitionId = HttpService:GenerateGUID(false),
+	})
 	local ok = pcall(function() TeleportService:TeleportAsync(GAME_PLACE_ID, party, options) end)
 	if not ok then
 		queue.launching = false
+		LobbyElevators.ResetDeparture(queue.id)
 		LobbyElevators.SetOpen(queue.id, true)
+		placeQueueMembers(queue)
 		broadcast()
 	end
 end
@@ -720,12 +757,16 @@ actionRemote.OnServerEvent:Connect(function(player: Player, action: string, valu
 		removeFromQueue(player)
 	elseif action == "Capacity" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId and typeof(value) == "number" then
 		queue.capacity = math.clamp(math.floor(value), math.max(PRIVATE_CAPACITY_MIN, queueCount(queue)), PRIVATE_CAPACITY_MAX)
+		if queue.capacity == 1 then
+			queue.blindMode = "Bot"
+			for member in queue.members do queue.votes[member] = "Bot" end
+		end
 		broadcast()
 	elseif action == "FriendsOnly" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId then
 		queue.friendsOnly = value == true
 		broadcast()
 	elseif action == "BlindMode" and queue then
-		queue.votes[player] = value == "Player" and "Player" or "Bot"
+		queue.votes[player] = if queue.kind == "Private" and queue.capacity == 1 then "Bot" else (if value == "Player" then "Player" else "Bot")
 		broadcast()
 	elseif action == "Start" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId then
 		launch(queue)

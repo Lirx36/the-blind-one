@@ -244,29 +244,31 @@ type Heard = {
 	arrivedAt: number?,
 }
 local heard: Heard? = nil
+local Hearing = require(ReplicatedStorage:WaitForChild("MonsterHearing"))
+local selectedAt = 0
 
 local function registerNoise(pos: Vector3, loudness: number, player: Player?)
 	if not monster.Parent then
 		return
 	end
-	local dist = (pos - root.Position).Magnitude
-	local strength = loudness - dist / Config.NoiseCarry
-	if strength < Config.MonsterHearingFloor then
-		return
-	end
-	-- the freshest sufficiently-strong sound wins; a much louder one always wins
-	if not heard or strength >= heard.strength - 4 or os.clock() - heard.at > 1.5 then
-		heard = {
-			pos = pos,
-			strength = strength,
-			at = os.clock(),
-			player = player,
-			arrivedAt = nil,
-		}
+	local strength = Hearing.Strength(loudness, (pos-root.Position).Magnitude, Config)
+	if not strength then return end
+	local now = os.clock()
+	local sameTarget = heard and player ~= nil and heard.player == player
+	local sameSound = heard and player == nil and heard.player == nil and (heard.pos-pos).Magnitude < 4
+	local oldScore = if heard then math.max(0, heard.strength - (now-heard.at)*6) else 0
+	if not heard or sameTarget or sameSound
+		or Hearing.ShouldSwitch(oldScore, strength, now-selectedAt, Config) then
+		local arrived = if heard and (heard.pos-pos).Magnitude < 2 then heard.arrivedAt else nil
+		if not sameTarget and not sameSound then selectedAt = now end
+		heard = {pos=pos,strength=strength,at=now,player=player,arrivedAt=arrived}
 	end
 end
 
-noiseBindable.Event:Connect(function(pos: Vector3, loudness: number)
+noiseBindable.Event:Connect(function(pos: Vector3, loudness: number, sourcePlayer: Player?)
+	-- Player footsteps are evaluated together in pollPlayers; anonymous
+	-- footsteps used to overwrite the chosen survivor several times a second.
+	if sourcePlayer then return end
 	registerNoise(pos, loudness, nil)
 end)
 
@@ -277,33 +279,54 @@ local lastHuntHeard = 0
 local targetSpeed = Config.MonsterWanderSpeed
 local currentSpeed = Config.MonsterWanderSpeed
 
+local patrolCooldowns: {[Vector3]: number} = {}
+local Patrol = require(ReplicatedStorage:WaitForChild("MonsterPatrol"))
+local coveragePlanner: any = nil
+local coverageNodeCount = -1
 local function nearestNode(from: Vector3): Vector3
-	if #patrolNodes == 0 then
-		return from
+	if coveragePlanner == nil or coverageNodeCount ~= #patrolNodes then
+		coveragePlanner = Patrol.New(patrolNodes)
+		coverageNodeCount = #patrolNodes
 	end
-	local pick = patrolNodes[math.random(#patrolNodes)]
-	-- bias slightly toward a random-but-not-current node so it roams
-	if wanderGoal and (pick - wanderGoal).Magnitude < 6 and #patrolNodes > 1 then
-		pick = patrolNodes[math.random(#patrolNodes)]
-	end
+	local now = os.clock()
+	local pick = coveragePlanner.Select(from, patrolCooldowns, now)
+	if pick ~= from then patrolCooldowns[pick] = now + 20 end
 	return pick
 end
 
+local function eligible(player: Player): boolean
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return player.Parent == Players and player:GetAttribute("InMatch") == true
+		and player:GetAttribute("Role") ~= "BlindOne" and hum ~= nil and hum.Health > 0
+end
+
 local function pollPlayers()
-	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("Role") == "BlindOne" then
-			continue
+	if heard and heard.player and not eligible(heard.player) then heard = nil end
+	local best: Player? = nil
+	local bestPosition = Vector3.zero
+	local bestNoise, bestScore = 0, -math.huge
+	-- Refresh the incumbent first, then compare all other survivors once.
+	if heard and heard.player then
+		local player = heard.player
+		local part = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		local noise = player:GetAttribute("Noise")
+		if part and part:IsA("BasePart") and typeof(noise) == "number" then
+			registerNoise(part.Position, noise, player)
 		end
-		local char = player.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		if hrp and hum and hum.Health > 0 then
-			local meter = player:GetAttribute("Noise")
-			if typeof(meter) == "number" and meter > 0 then
-				registerNoise(hrp.Position, meter, player)
+	end
+	for _, player in Players:GetPlayers() do
+		if not eligible(player) then continue end
+		local part = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		local noise = player:GetAttribute("Noise")
+		if part and part:IsA("BasePart") and typeof(noise) == "number" then
+			local score = Hearing.Strength(noise, (part.Position-root.Position).Magnitude, Config)
+			if score and (score > bestScore or (score == bestScore and best and player.UserId < best.UserId)) then
+				best, bestPosition, bestNoise, bestScore = player, part.Position, noise, score
 			end
 		end
 	end
+	if best then registerNoise(bestPosition, bestNoise, best) end
+	monster:SetAttribute("HearingTargetUserId", if heard and heard.player then heard.player.UserId else 0)
 end
 
 local function decide()
@@ -311,7 +334,7 @@ local function decide()
 	if heard then
 		local age = now - heard.at
 		local distToHeard = (heard.pos - root.Position).Magnitude
-		local escalate = heard.player ~= nil
+		local escalate = age < 0.4 and heard.player ~= nil
 			and heard.strength > Config.MonsterHuntNoise
 			and distToHeard < Config.MonsterHuntRange
 		if escalate then
@@ -336,7 +359,7 @@ local function decide()
 					state = "wander"
 					wanderGoal = nil
 				end
-			elseif age > Config.MonsterInvestigateTime + 12 then
+			elseif age > Config.BotSoundMemory then
 				-- Abandon an unreachable sound eventually instead of pursuing it
 				-- forever, but never resume a patrol target from before the sound.
 				heard = nil
@@ -456,14 +479,34 @@ end
 task.wait(1.5) -- let MapBuilder finish placing nodes
 spawnMonster()
 
+-- Monitor actual progress outside the mover, including its early returns.
+local patrolProgressPosition = root.Position
+local patrolProgressAt = os.clock()
+local function recoverPatrol(now: number)
+	if (root.Position-patrolProgressPosition).Magnitude >= 1.5 then
+		patrolProgressPosition, patrolProgressAt = root.Position, now
+	elseif state == "wander" and now-patrolProgressAt >= 3 then
+		if wanderGoal then patrolCooldowns[wanderGoal] = now + 45 end
+		wanderGoal = nil
+		waypoints, wpIndex, directFallbackGoal = {}, 1, nil
+		routeDirty = true
+		patrolProgressPosition, patrolProgressAt = root.Position, now
+		monster:SetAttribute("PatrolRecoveries", (monster:GetAttribute("PatrolRecoveries") or 0)+1)
+	end
+end
+
 -- decision loop: choose a goal, refresh the path only when it's stale
 task.spawn(function()
 	while true do
-		if monster.Parent and humanoid.Health > 0 then
+		if monster.Parent and humanoid.Health > 0 and not photoFrozen then
 			if #patrolNodes == 0 then
 				patrolNodes = gatherNodes()
 			end
 			pollPlayers()
+			if state ~= "wander" then
+				patrolProgressPosition, patrolProgressAt = root.Position, os.clock()
+			end
+			recoverPatrol(os.clock())
 			local goal = decide()
 			local maxAge = (state == "hunt") and 0.4 or 0.9
 			local moved = (goal - currentGoal).Magnitude > 6
@@ -481,28 +524,21 @@ task.spawn(function()
 				or (finishedRoute and (goal-root.Position).Magnitude > 4.5)
 			if needsRoute and not computing and os.clock()-lastCompute >= 0.75 then
 				computing = true
-				recompute(goal)
+				local ok, problem = pcall(recompute, goal)
 				computing = false
+				if not ok then
+					waypoints, wpIndex, directFallbackGoal = {}, 1, nil
+					routeDirty = true
+					warn("Monster navigation retry: ", problem)
+				end
 			end
+		else
+			patrolProgressPosition, patrolProgressAt = root.Position, os.clock()
 		end
 		task.wait(0.15)
 	end
 end)
 
-
-local lastProgressPosition = root.Position
-local lastProgressAt = os.clock()
-
-
-local function abandonBlockedRoute()
-	waypoints = {}
-	wpIndex = 1
-	directFallbackGoal = nil
-	lastCompute = 0
-	if state == "wander" then
-		wanderGoal = nil
-	end
-end
 
 -- mover: carry the anchored root along the path by CFrame every frame
 RunService.Heartbeat:Connect(function(dt)
@@ -571,15 +607,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local goalRot = CFrame.lookAt(Vector3.zero, dir).Rotation
 	local easedRot = root.CFrame.Rotation:Lerp(goalRot, math.clamp(dt * 6, 0, 1))
 	monster:PivotTo(CFrame.new(newPos) * easedRot)
-	if (newPos - lastProgressPosition).Magnitude >= 1.5 then
-		lastProgressPosition = newPos
-		lastProgressAt = os.clock()
-	elseif os.clock() - lastProgressAt > 1.25 then
-		-- A second safety net for corner overlaps that return inconsistent casts.
-		abandonBlockedRoute()
-		lastProgressPosition = newPos
-		lastProgressAt = os.clock()
-	end
+
 end)
 
 -- brief invulnerability right after (re)spawning

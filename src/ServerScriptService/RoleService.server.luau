@@ -111,10 +111,10 @@ local function setRole(player: Player, role: string)
 		else
 			local map = workspace:FindFirstChild("GeneratedMap")
 			local active = if map then map:GetAttribute("MechanismsActive") else 0
-			local total = if map then map:GetAttribute("MechanismsTotal") else 3
-			Remotes.Objective:FireClient(player, ("Restore the gate mechanisms (%d/%d). Stay quiet."):format(
+			local total = if map then map:GetAttribute("MechanismsTotal") else 5
+			Remotes.Objective:FireClient(player, ("Restore the generators (%d/%d). Stay quiet."):format(
 				if typeof(active) == "number" then active else 0,
-				if typeof(total) == "number" then total else 3
+				if typeof(total) == "number" then total else 5
 			))
 		end
 	end

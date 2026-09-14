@@ -11,6 +11,8 @@ local NAMES = {
 	"Throw", -- client -> server: throw a held rock in a direction
 	"Pickup", -- client -> server: pick up a nearby rock
 	"HeldCount", -- server -> client: how many rocks you hold
+	"GeneratorMinigame", -- server <-> client: timed generator calibration
+	"DeathAction", -- client -> server: respawn or return to the lobby
 	"Objective", -- server -> client: objective text
 	"PhotoMode", -- Studio testing: client toggles the solo AI freeze
 	"LobbyAction", -- client -> server: enter lobby, set capacity, or start

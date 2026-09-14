@@ -8,9 +8,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local MaterialService = game:GetService("MaterialService")
 local Layout = require(ReplicatedStorage:WaitForChild("MazeLayout"))
-local MAP_VERSION = "HollowLabyrinth_3_Detailed"
+local MAP_VERSION = "HollowLabyrinth_4_RandomGenerators"
 local oldMap = Workspace:FindFirstChild("GeneratedMap")
-if oldMap and oldMap:GetAttribute("MapVersion") == MAP_VERSION then return end
 if oldMap then oldMap:Destroy() end
 local loopCount = Layout.Validate()
 
@@ -19,7 +18,7 @@ map.Name = "GeneratedMap"
 map:SetAttribute("MapVersion", MAP_VERSION)
 map:SetAttribute("MapKind", "Maze")
 map:SetAttribute("MechanismsActive", 0)
-map:SetAttribute("MechanismsTotal", 3)
+map:SetAttribute("MechanismsTotal", 5)
 map:SetAttribute("GateOpen", false)
 map:SetAttribute("Ready", false)
 map.Parent = Workspace
@@ -300,12 +299,14 @@ for _, room in Layout.Rooms do
 		prop("MazeWheelchair",landmarks,"CourtWheelchair",center+Vector3.new(-12,0,12),-28,1.05,true)
 		prop("MazeCrateSet",landmarks,"CourtOfferings",center+Vector3.new(12,0,-12),18,1.7,true)
 	elseif room.Id=="POWER" then
-		local detailedGenerator = prop("MazeIndustrialGenerator",landmarks,"IndustrialGenerator",center+Vector3.new(-12,0,4),180,0.36,true)
-		if not detailedGenerator then
-			local machine=part("Generator",Vector3.new(11,6,7),center+Vector3.new(-12,3,4),Color3.fromRGB(71,78,62),Enum.Material.CorrodedMetal,landmarks)
-			for x=-4,4,1.1 do part("CoolingFin",Vector3.new(0.18,4,0.3),machine.Position+Vector3.new(x,0,-3.7),Color3.fromRGB(32,36,31),Enum.Material.Metal,landmarks,true) end
+		-- The old oversized store generator was removed. This room now carries
+		-- switchgear dressing while the five working generators relocate each round.
+		for x=-14,14,7 do
+			local cabinet=part("PowerBusCabinet",Vector3.new(5.5,8,3),center+Vector3.new(x,4,15),Color3.fromRGB(35,43,43),Enum.Material.DiamondPlate,landmarks)
+			local status=part("PowerBusStatus",Vector3.new(3.7,0.22,0.18),cabinet.Position+Vector3.new(0,2,-1.58),Color3.fromRGB(118,48,34),Enum.Material.Neon,landmarks,true)
+			lamp(status,status.Color,0.18,5)
 		end
-		tube("Exhaust",center+Vector3.new(-12,6,5),center+Vector3.new(-12,19,5),1.2,Color3.fromRGB(52,51,45),landmarks)
+		tube("PowerBusConduit",center+Vector3.new(-18,8,16.8),center+Vector3.new(18,8,16.8),0.65,Color3.fromRGB(50,57,55),landmarks)
 	elseif room.Id=="WATER" then
 		local water=part("FloodedTiles",Vector3.new(32,0.025,31),center+Vector3.new(0,0.13,0),Color3.fromRGB(66,99,105),Enum.Material.Glass,landmarks,true)
 		water.Transparency,water.Reflectance=0.52,0.24
@@ -336,27 +337,134 @@ for _, room in Layout.Rooms do
 	end
 end
 
-local function mechanism(id: string, displayName: string, center: Vector3)
+local function mechanism(id: string, displayName: string, center: Vector3, yaw: number)
 	local station=Instance.new("Model")
 	station.Name,station.Parent="GateMechanism_"..id,map
 	station:SetAttribute("MechanismId",id)
 	station:SetAttribute("DisplayName",displayName)
 	station:SetAttribute("Activated",false)
-	local base=part("Base",Vector3.new(4,4.5,2.6),center+Vector3.new(0,2.25,0),Color3.fromRGB(63,72,64),Enum.Material.CorrodedMetal,station)
+	station:SetAttribute("RepairingUserId",0)
+	station:SetAttribute("LockedUntil",0)
+	local machineFrame=CFrame.new(center)*CFrame.Angles(0,math.rad(yaw),0)
+	local function machinePart(name: string, size: Vector3, offset: Vector3, color: Color3, material: Enum.Material, decorative: boolean?): Part
+		local object=part(name,size,center+offset,color,material,station,decorative)
+		object.CFrame=machineFrame*CFrame.new(offset)
+		return object
+	end
+	-- The collision footprint stays below six studs so survivors and the Blind
+	-- One retain a navigable channel around a generator in every maze cell.
+	local plinth=machinePart("Plinth",Vector3.new(5,0.65,3.8),Vector3.new(0,0.33,0),Color3.fromRGB(24,29,29),Enum.Material.DiamondPlate)
+	local base=machinePart("Base",Vector3.new(4.8,5.6,3),Vector3.new(0,3.15,0.25),Color3.fromRGB(38,48,48),Enum.Material.Metal)
 	station.PrimaryPart=base
-	local core=part("Core",Vector3.new(1.4,0.55,0.2),center+Vector3.new(0,3.5,-1.4),Color3.fromRGB(150,62,38),Enum.Material.Neon,station,true)
-	lamp(core,core.Color,0.35,8)
-	for x=-1,1 do part("Breaker",Vector3.new(0.3,1,0.2),center+Vector3.new(x,2,-1.4),Color3.fromRGB(156,149,112),Enum.Material.Metal,station,true) end
+	for _, x in {-2.55,2.55} do
+		machinePart("ArmoredCorner",Vector3.new(0.38,5.9,3.65),Vector3.new(x,3.2,0.25),Color3.fromRGB(74,85,82),Enum.Material.DiamondPlate,true)
+	end
+	local alternator=machinePart("Alternator",Vector3.new(4.1,2.5,2.5),Vector3.new(0,2.45,1.35),Color3.fromRGB(28,35,35),Enum.Material.Metal,true)
+	alternator.Shape=Enum.PartType.Cylinder
+	for x=-1.5,1.5,0.5 do
+		machinePart("AlternatorFin",Vector3.new(0.14,2.82,2.82),Vector3.new(x,2.45,1.35),Color3.fromRGB(63,74,72),Enum.Material.Metal,true).Shape=Enum.PartType.Cylinder
+	end
+	local panel=machinePart("ControlPanel",Vector3.new(4.75,3.7,0.42),Vector3.new(0,3.45,-1.68),Color3.fromRGB(15,21,22),Enum.Material.DiamondPlate,true)
+	panel.CanQuery=true
+	local core=machinePart("Core",Vector3.new(1.8,0.78,0.16),Vector3.new(0.65,4.35,-1.96),Color3.fromRGB(157,42,29),Enum.Material.Neon,true)
+	lamp(core,core.Color,0.55,10)
+	local meter=machinePart("VoltageMeter",Vector3.new(1.05,1.05,0.18),Vector3.new(-1.55,4.25,-1.97),Color3.fromRGB(174,183,165),Enum.Material.Glass,true)
+	for x=-1.8,1.8,0.6 do
+		machinePart("VentSlat",Vector3.new(0.38,0.14,0.2),Vector3.new(x,2.05,-1.98),Color3.fromRGB(90,104,99),Enum.Material.Metal,true)
+	end
+	for x=-1.5,1.5,1.5 do
+		local breaker=machinePart("Breaker",Vector3.new(0.38,0.95,0.28),Vector3.new(x,3.05,-2.34),Color3.fromRGB(180,166,112),Enum.Material.Metal,true)
+		breaker.CFrame=breaker.CFrame*CFrame.Angles(math.rad(-18),0,0)
+	end
+	for _, x in {-2,2} do
+		local stack=machinePart("ExhaustStack",Vector3.new(4.7,0.76,0.76),Vector3.new(x,7.15,1.05),Color3.fromRGB(46,55,54),Enum.Material.Metal,true)
+		stack.Shape=Enum.PartType.Cylinder
+		stack.CFrame=stack.CFrame*CFrame.Angles(0,0,math.rad(90))
+		local cap=machinePart("ExhaustCap",Vector3.new(1.05,1.05,1.05),Vector3.new(x,9.48,1.05),Color3.fromRGB(75,83,78),Enum.Material.Metal,true)
+		cap.Shape=Enum.PartType.Ball
+	end
+	for _, x in {-2.2,2.2} do
+		machinePart("HazardStripe",Vector3.new(0.3,0.16,3.5),Vector3.new(x,0.72,0),Color3.fromRGB(202,151,44),Enum.Material.Neon,true)
+	end
+	local hum=Instance.new("Sound")
+	hum.Name="GeneratorHum"
+	hum.SoundId="rbxassetid://9125446543"
+	hum.Looped,hum.Volume,hum.RollOffMinDistance,hum.RollOffMaxDistance=true,0,8,52
+	hum.Parent=core
 	local prompt=Instance.new("ProximityPrompt")
-	prompt.Name,prompt.ActionText,prompt.ObjectText="RestorePrompt","Restore mechanism",displayName
+	prompt.Name,prompt.ActionText,prompt.ObjectText="RestorePrompt","Calibrate generator",displayName
 	prompt.KeyboardKeyCode,prompt.GamepadKeyCode=Enum.KeyCode.E,Enum.KeyCode.ButtonX
-	prompt.HoldDuration,prompt.MaxActivationDistance,prompt.RequiresLineOfSight=3.2,9,true
-	prompt.Parent=base
+	prompt.HoldDuration,prompt.MaxActivationDistance,prompt.RequiresLineOfSight=0,10,true
+	-- Clickable prompts currently capture first-person camera input while visible on
+	-- desktop. Keyboard remains E; touch devices can still tap prompts natively.
+	prompt.ClickablePrompt=false
+	prompt.Parent=panel
+	local lockoutGui=Instance.new("BillboardGui")
+	lockoutGui.Name="LockoutBillboard"
+	lockoutGui.Size=UDim2.fromOffset(260,38)
+	lockoutGui.StudsOffset=Vector3.new(0,3.7,0)
+	lockoutGui.AlwaysOnTop=true
+	lockoutGui.MaxDistance=38
+	lockoutGui.Enabled=false
+	lockoutGui.Parent=panel
+	local lockoutLabel=Instance.new("TextLabel")
+	lockoutLabel.Name="Status"
+	lockoutLabel.Size=UDim2.fromScale(1,1)
+	lockoutLabel.BackgroundColor3=Color3.fromRGB(22,4,3)
+	lockoutLabel.BackgroundTransparency=0.12
+	lockoutLabel.BorderSizePixel=0
+	lockoutLabel.Font=Enum.Font.GothamBold
+	lockoutLabel.Text="SYSTEM LOCKED  //  01:30"
+	lockoutLabel.TextColor3=Color3.fromRGB(235,85,66)
+	lockoutLabel.TextSize=14
+	lockoutLabel.TextStrokeTransparency=0.45
+	lockoutLabel.Parent=lockoutGui
+	local lockoutCorner=Instance.new("UICorner")
+	lockoutCorner.CornerRadius=UDim.new(0,7)
+	lockoutCorner.Parent=lockoutLabel
 	CollectionService:AddTag(station,"GateMechanism")
 end
-mechanism("POWER","Generator House / Power",Layout.Position(4,5)+Vector3.new(14,0,12))
-mechanism("WATER","Drowned Gallery / Pump",Layout.Position(16,5)+Vector3.new(11,0,-12))
-mechanism("RECORDS","Records Yard / Relay",Layout.Position(16,15)+Vector3.new(0,0,-14))
+
+-- A fresh farthest-point spread is chosen every server. Candidates stay out of
+-- landmark rooms and away from the player spawn, while the 72-stud preference
+-- prevents the five repairs from clustering in one corner of the maze.
+local generatorRng=Random.new()
+local generatorCandidates: {Vector3}={}
+local spawnOrigin=Layout.Position(10,19)
+for z=2,N-1 do
+	for x=2,N-1 do
+		local candidate=Layout.Position(x,z)
+		if not roomAt(x,z) and #Layout.Neighbors(x,z)>=2 and (candidate-spawnOrigin).Magnitude>=54
+			and (x*13+z*7)%23~=0 then
+			table.insert(generatorCandidates,candidate)
+		end
+	end
+end
+local generatorPositions: {Vector3}={}
+if #generatorCandidates>0 then
+	table.insert(generatorPositions,table.remove(generatorCandidates,generatorRng:NextInteger(1,#generatorCandidates)))
+end
+while #generatorPositions<5 and #generatorCandidates>0 do
+	local ranked={}
+	for index,candidate in generatorCandidates do
+		local nearest=math.huge
+		for _,selected in generatorPositions do nearest=math.min(nearest,(candidate-selected).Magnitude) end
+		table.insert(ranked,{index=index,position=candidate,distance=nearest})
+	end
+	table.sort(ranked,function(a,b) return a.distance>b.distance end)
+	local eligibleCount=0
+	for _,entry in ranked do
+		if entry.distance<72 then break end
+		eligibleCount+=1
+	end
+	local poolSize=math.min(8,if eligibleCount>0 then eligibleCount else #ranked)
+	local chosen=ranked[generatorRng:NextInteger(1,poolSize)]
+	table.insert(generatorPositions,chosen.position)
+	table.remove(generatorCandidates,chosen.index)
+end
+for index,position in generatorPositions do
+	mechanism(string.format("GEN_%02d",index),string.format("AUXILIARY GENERATOR %02d",index),position,generatorRng:NextInteger(0,3)*90)
+end
 local spawnPad=Instance.new("SpawnLocation")
 spawnPad.Name,spawnPad.Size,spawnPad.Position="Spawn",Vector3.new(6,0.4,6),Layout.Position(10,19)+Vector3.new(0,0.4,0)
 spawnPad.Anchored,spawnPad.Transparency,spawnPad.CanCollide,spawnPad.Duration=true,1,false,0
@@ -377,7 +485,7 @@ local header=part("ExitHeader",Vector3.new(22,3,3),gateCenter+Vector3.new(0,19,0
 label(header,"PERIMETER / EXIT",Color3.fromRGB(179,189,162),Enum.NormalId.Back)
 local crank=part("GateCrank",Vector3.new(2,3.5,2),gateCenter+Vector3.new(6,1.75,7),Color3.fromRGB(74,78,63),Enum.Material.CorrodedMetal)
 local prompt=Instance.new("ProximityPrompt")
-prompt.Name,prompt.ActionText,prompt.ObjectText="GatePrompt","Gate locked (0/3)","Labyrinth perimeter"
+prompt.Name,prompt.ActionText,prompt.ObjectText="GatePrompt","Gate locked (0/5)","Labyrinth perimeter"
 prompt.KeyboardKeyCode,prompt.GamepadKeyCode=Enum.KeyCode.E,Enum.KeyCode.ButtonX
 prompt.HoldDuration,prompt.MaxActivationDistance,prompt.RequiresLineOfSight=0.35,9,true
 prompt.Parent=crank
