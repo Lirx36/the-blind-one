@@ -23,7 +23,15 @@ local descendantRemovingConnection: RBXScriptConnection? = nil
 -- also lowers the visible character.
 local STANDING_CAMERA_OFFSET = Vector3.new(0, 0.3, -0.85)
 local CROUCH_CAMERA_OFFSET = Vector3.new(0, -0.32, -0.85)
+local BLIND_ONE_CAMERA_HEIGHT = 1.2
 local CAMERA_RESPONSE = 12
+
+local function matchCameraOffset(crouched: boolean): Vector3
+	local base = if crouched then CROUCH_CAMERA_OFFSET else STANDING_CAMERA_OFFSET
+	return if player:GetAttribute("Role") == "BlindOne"
+		then base + Vector3.new(0, BLIND_ONE_CAMERA_HEIGHT, 0)
+		else base
+end
 
 local VISIBLE_BODY_PARTS = {
 	UpperTorso = true,
@@ -170,7 +178,7 @@ local function setCharacter(nextCharacter: Model)
 	descendantAddedConnection = nextCharacter.DescendantAdded:Connect(cacheDescendant)
 	descendantRemovingConnection = nextCharacter.DescendantRemoving:Connect(forgetDescendant)
 
-	nextHumanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
+	nextHumanoid.CameraOffset = if player:GetAttribute("InMatch") == true then matchCameraOffset(false) else Vector3.zero
 	if player:GetAttribute("Spectating") ~= true then
 		local camera = workspace.CurrentCamera
 		if camera then
@@ -231,7 +239,7 @@ player.CharacterAdded:Connect(setCharacter)
 player:GetAttributeChangedSignal("InMatch"):Connect(function()
 	updateCameraMode()
 	if humanoid then
-		humanoid.CameraOffset = if player:GetAttribute("InMatch") == true then STANDING_CAMERA_OFFSET else Vector3.zero
+		humanoid.CameraOffset = if player:GetAttribute("InMatch") == true then matchCameraOffset(false) else Vector3.zero
 	end
 end)
 player:GetAttributeChangedSignal("Spectating"):Connect(updateCameraMode)
@@ -259,7 +267,7 @@ RunService:BindToRenderStep("FirstPersonLowerBody", Enum.RenderPriority.Camera.V
 	local targetAlpha = if isCrouched then 1 else 0
 	local blend = 1 - math.exp(-CAMERA_RESPONSE * dt)
 	crouchAlpha += (targetAlpha - crouchAlpha) * blend
-	local targetCameraOffset = if isCrouched then CROUCH_CAMERA_OFFSET else STANDING_CAMERA_OFFSET
+	local targetCameraOffset = matchCameraOffset(isCrouched)
 	currentHumanoid.CameraOffset = currentHumanoid.CameraOffset:Lerp(targetCameraOffset, blend)
 
 	for part in visibleParts do

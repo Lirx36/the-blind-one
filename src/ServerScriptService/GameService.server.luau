@@ -56,6 +56,11 @@ local connectedEscapeZones: { [Instance]: boolean } = {}
 local crankHolds: { [Player]: boolean } = {}
 local gateOpening = false
 local GENERATOR_LOCKOUT_SECONDS = 90
+local REQUIRED_GENERATORS = 5
+local sawSurvivor = false
+local survivorEscaped = false
+local hunterVictory = false
+local hunterVictoryCandidateAt: number? = nil
 
 type RepairSession = { station: Instance, token: string, startedAt: number }
 local repairSessions: { [Player]: RepairSession } = {}
@@ -119,17 +124,18 @@ end
 
 local function mechanismProgress(): (number, number)
 	local active = 0
-	local total = 0
+	local available = 0
 	for _, station in CollectionService:GetTagged("GateMechanism") do
 		if station:IsDescendantOf(generatedMap) then
-			total += 1
+			available += 1
 			if station:GetAttribute("Activated") == true then active += 1 end
 		end
 	end
-	total = math.max(total, generatedMap:GetAttribute("MechanismsTotal") or 5)
-	generatedMap:SetAttribute("MechanismsActive", active)
-	generatedMap:SetAttribute("MechanismsTotal", total)
-	return active, total
+	local progress = math.min(active, REQUIRED_GENERATORS)
+	generatedMap:SetAttribute("MechanismsActive", progress)
+	generatedMap:SetAttribute("MechanismsTotal", REQUIRED_GENERATORS)
+	generatedMap:SetAttribute("MechanismsAvailable", available)
+	return progress, REQUIRED_GENERATORS
 end
 
 local function survivorObjective(): string
@@ -137,7 +143,7 @@ local function survivorObjective(): string
 	if generatedMap:GetAttribute("GateOpen") == true then
 		return "THE GATE IS OPEN — escape the labyrinth."
 	elseif active >= total then
-		return "ALL GENERATORS RESTORED — crank open the perimeter gate."
+		return "POWER REQUIREMENT MET — crank open the perimeter gate."
 	end
 	return ("Restore the generators (%d/%d). Stay quiet."):format(active, total)
 end
@@ -201,6 +207,14 @@ local function onCharacter(player: Player, character: Model)
 end
 
 local function setupPlayer(player: Player)
+	local function rememberSurvivor()
+		if player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "Survivor" then
+			sawSurvivor = true
+		end
+	end
+	player:GetAttributeChangedSignal("Role"):Connect(rememberSurvivor)
+	player:GetAttributeChangedSignal("InMatch"):Connect(rememberSurvivor)
+	rememberSurvivor()
 	if player:GetAttribute("RespawnsRemaining") == nil then
 		player:SetAttribute("RespawnsRemaining", Config.MaxRespawns)
 	end
@@ -254,6 +268,7 @@ end
 Remotes.DeathAction.OnServerEvent:Connect(function(player: Player, action: any)
 	if typeof(action) ~= "string" or player:GetAttribute("AwaitingDeathChoice") ~= true then return end
 	if action == "Respawn" then
+		if player:GetAttribute("RecoveryContext") == "HunterVictory" then return end
 		if respawnRequests[player] then return end
 		local remaining = math.max(0, tonumber(player:GetAttribute("RespawnsRemaining")) or 0)
 		if remaining <= 0 then return end
@@ -358,12 +373,11 @@ local function completeMechanism(player: Player, station: Instance)
 	local prompt = station:FindFirstChild("RestorePrompt", true)
 	if prompt and prompt:IsA("ProximityPrompt") then prompt.Enabled = false end
 	setMechanismVisual(station, true)
-	markPlayerNoise(player, 92, 1.5)
-	noiseBindable:Fire(stationPosition(station), 96)
+	noiseBindable:Fire(stationPosition(station), 100, nil, "GeneratorAlert")
 	local active, total = mechanismProgress()
 	refreshGatePrompt()
 	if active >= total then
-		broadcastSurvivorObjective("ALL GENERATORS RESTORED — crank open the perimeter gate.")
+		broadcastSurvivorObjective("POWER REQUIREMENT MET — crank open the perimeter gate.")
 	else
 		broadcastSurvivorObjective(("Generator restored (%d/%d). Find the others."):format(active, total))
 	end
@@ -394,16 +408,7 @@ local function beginRepair(player: Player, station: Instance, prompt: ProximityP
 	stationRepairers[station] = player
 	station:SetAttribute("RepairingUserId", player.UserId)
 	prompt.Enabled = false
-	markPlayerNoise(player, 64, 0.9)
 	Remotes.GeneratorMinigame:FireClient(player, "Begin", station, session.token)
-	task.spawn(function()
-		while repairSessions[player] == session and stationRepairers[station] == player
-			and station.Parent and station:GetAttribute("Activated") ~= true do
-			markPlayerNoise(player, 68, 0.9)
-			noiseBindable:Fire(stationPosition(station), 72)
-			task.wait(0.72)
-		end
-	end)
 	task.delay(28, function()
 		if repairSessions[player] == session then
 			clearRepair(player)
@@ -427,6 +432,7 @@ Remotes.GeneratorMinigame.OnServerEvent:Connect(function(player: Player, action:
 		clearRepair(player)
 		local lockedUntil = workspace:GetServerTimeNow() + GENERATOR_LOCKOUT_SECONDS
 		startGeneratorLockout(station, lockedUntil)
+		noiseBindable:Fire(stationPosition(station), 100, nil, "GeneratorAlert")
 		Remotes.GeneratorMinigame:FireClient(player, "Locked", GENERATOR_LOCKOUT_SECONDS)
 		return
 	end
@@ -536,6 +542,7 @@ local function connectEscapeZone(zone: Instance)
 		local player = character and Players:GetPlayerFromCharacter(character)
 		if not player or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("Escaped") == true then return end
 		player:SetAttribute("Escaped", true)
+		survivorEscaped = true
 		player:SetAttribute("RecoveryContext", "Escape")
 		setObjective(player, "YOU ESCAPED THE HOLLOW.")
 		broadcastSurvivorObjective()
@@ -556,5 +563,48 @@ task.delay(1, function()
 	if RunService:IsStudio() and Config.StudioAutoOpenGate == true then
 		local crank = CollectionService:GetTagged("GateCrank")[1]
 		if crank then openGate(nil, crank) end
+	end
+end)
+
+-- A survivor on the death terminal still has a chance while any respawns remain.
+-- Once every survivor is permanently out (or has disconnected), show the
+-- match result. The short hold lets the final death jumpscare finish first.
+task.spawn(function()
+	while not hunterVictory do
+		task.wait(0.4)
+		if survivorEscaped then continue end
+		local survivorsCanReturn = false
+		for _, member in Players:GetPlayers() do
+			if member:GetAttribute("InMatch") ~= true then continue end
+			local role = member:GetAttribute("Role")
+			if role == "Survivor" then
+				sawSurvivor = true
+				if member:GetAttribute("Escaped") == true then
+					survivorEscaped = true
+					survivorsCanReturn = true
+				elseif respawnRequests[member]
+					or (tonumber(member:GetAttribute("RespawnsRemaining")) or 0) > 0 then
+					survivorsCanReturn = true
+				else
+					local character = member.Character
+					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+					if humanoid and humanoid.Health > 0 then survivorsCanReturn = true end
+				end
+			end
+		end
+		if sawSurvivor and not survivorsCanReturn and not survivorEscaped then
+			hunterVictoryCandidateAt = hunterVictoryCandidateAt or os.clock()
+			if os.clock() - hunterVictoryCandidateAt < 3.5 then continue end
+			hunterVictory = true
+			workspace:SetAttribute("MatchOutcome", "BlindOne")
+			for _, member in Players:GetPlayers() do
+				if member:GetAttribute("InMatch") == true then
+					member:SetAttribute("RecoveryContext", "HunterVictory")
+					member:SetAttribute("AwaitingDeathChoice", true)
+				end
+			end
+		else
+			hunterVictoryCandidateAt = nil
+		end
 	end
 end)

@@ -558,7 +558,7 @@ local function addPublicRig(root: Folder, bunker: Instance)
 	slots.Name = "Slots"
 	slots.Parent = rig
 	local slotIndex = 0
-	local publicSlotOffsets = { 0, -1, 1, -2, 2 }
+	local publicSlotOffsets = { 0, -1, 1 }
 	for row = 0, 1 do
 		for _, column in ipairs(publicSlotOffsets) do
 			slotIndex += 1
@@ -582,11 +582,30 @@ local function rootFolder(): Folder?
 	return if root and root:IsA("Folder") then root else nil
 end
 
+local function alignPublicSlots(root: Folder)
+	local rig = root:FindFirstChild("QueueElevator_Public")
+	local slots = rig and rig:FindFirstChild("Slots")
+	if not slots then return end
+	local columns = { 0, -1, 1 }
+	for index = 1, 10 do
+		local slot = slots:FindFirstChild(string.format("Slot%02d", index))
+		if slot and index > 6 then
+			slot:Destroy()
+		elseif slot and slot:IsA("BasePart") then
+			local row = math.floor((index - 1) / 3)
+			local column = columns[(index - 1) % 3 + 1]
+			local position = Vector3.new(column * 6.5, 425, 89.2 + row * 6.1)
+			slot.CFrame = CFrame.lookAt(position, Vector3.new(position.X, position.Y, 82.9))
+		end
+	end
+end
+
 function LobbyElevators.Ensure(): Folder?
 	local bunker = workspace:FindFirstChild(BUNKER_NAME)
 	if not bunker then return nil end
 	local existing = bunker:FindFirstChild(ROOT_NAME)
 	if existing and existing:IsA("Folder") and existing:GetAttribute("BuildVersion") == BUILD_VERSION then
+		alignPublicSlots(existing)
 		return existing
 	end
 	if existing then

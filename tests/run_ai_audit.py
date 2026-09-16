@@ -45,6 +45,8 @@ end
 """
 functions = section(monster,'local function humanBlindOne()', '-- Rojo can restart')
 functions += section(monster,'local function registerNoise(', 'noiseBindable.Event:Connect')
+functions += '\nlocal generatorAlert\nlocal noiseBindable={Event={Connect=function(_, fn) generatorAlert=fn end}}\n'
+functions += section(monster,'noiseBindable.Event:Connect', '------------------------------------------------------------------- main AI loop')
 functions += section(monster,'local function eligible(', '------------------------------------------------------------------- locomotion')
 cases=r"""
 check(Config.MonsterHuntSpeed==17.5,'bot hunt speed 17.5')
@@ -74,6 +76,28 @@ check(heard.player==nil and state=='investigate' and targetSpeed==14,'rock diver
 now+=20;decide();check(heard~=nil,'travel time does not consume six second search')
 root.Position=Vector3.new(40,0,0);decide();now+=6.1;decide()
 check(heard==nil and state=='wander','six seconds at sound then resume patrol')
+-- Execute the actual generator event callback, not just registerNoise.
+root.Position=Vector3.zero;heard=nil;roster={};now+=10
+local generatorPos=Vector3.new(400,0,0)
+generatorAlert(generatorPos,100,nil,"GeneratorAlert")
+check(heard and heard.generator and heard.pos==generatorPos,'generator alert heard beyond normal hearing range')
+decide();check(state=='investigate','generator alert starts investigation')
+now+=30;decide();check(heard~=nil and not heard.arrivedAt,'distant generator allows travel time')
+root.Position=Vector3.new(394,0,0)
+local inspectionGoal=decide()
+check(heard.arrivedAt~=nil and inspectionGoal==root.Position and targetSpeed==0,'generator inspection stops beside machine')
+now+=2.6;decide();check(heard==nil and state=='wander','generator inspection ends in patrol')
+root.Position=Vector3.zero;now+=10
+registerNoise(a.part.Position,100,a)
+generatorAlert(generatorPos,100,nil,"GeneratorAlert")
+check(heard.player==a,'fresh survivor pursuit takes priority over generator')
+now+=Config.MonsterHuntGrace+0.1
+generatorAlert(generatorPos,100,nil,"GeneratorAlert")
+check(heard.generator==true,'stale survivor memory does not discard generator alert')
+registerNoise(Vector3.new(10,0,0),24,b)
+check(heard.player==b and not heard.generator,'audible survivor immediately interrupts generator investigation')
+heard=nil;generatorAlert(generatorPos,100,nil,"GeneratorAlert")
+now+=91;decide();check(heard==nil and state=='wander','unreachable generator eventually resumes patrol')
 local nodes={};for x=0,2 do for z=0,2 do table.insert(nodes,Vector3.new(x*100,0,z*100)) end end
 local planner=Patrol.New(nodes);local pos=nodes[1];local visited={[pos]=true}
 for i=1,8 do pos=planner.Select(pos,{},i);visited[pos]=true end

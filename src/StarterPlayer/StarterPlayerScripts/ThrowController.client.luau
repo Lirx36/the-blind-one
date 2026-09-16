@@ -63,18 +63,10 @@ pickupOutline.OutlineTransparency = 0.02
 pickupOutline.Enabled = false
 pickupOutline.Parent = Workspace
 
-local pickupBillboard = Instance.new("BillboardGui")
-pickupBillboard.Name = "LocalBallPickupPrompt"
-pickupBillboard.AlwaysOnTop = true
-pickupBillboard.LightInfluence = 0
-pickupBillboard.MaxDistance = PICKUP_RANGE + 3
-pickupBillboard.Size = UDim2.fromOffset(112, 34)
-pickupBillboard.StudsOffsetWorldSpace = Vector3.new(0, 1.2, 0)
-pickupBillboard.Enabled = false
-pickupBillboard.Parent = player:WaitForChild("PlayerGui")
-
 local prompt = Instance.new("TextLabel")
-prompt.Size = UDim2.fromScale(1, 1)
+prompt.Name = "LocalBallPickupPrompt"
+prompt.AnchorPoint = Vector2.new(0.5, 0.5)
+prompt.Size = UDim2.fromOffset(112, 34)
 prompt.BackgroundColor3 = Color3.fromRGB(8, 11, 14)
 prompt.BackgroundTransparency = 0.15
 prompt.BorderSizePixel = 0
@@ -83,7 +75,8 @@ prompt.Text = "E  ·  PICK UP"
 prompt.TextSize = 13
 prompt.TextColor3 = Color3.fromRGB(245, 250, 255)
 prompt.TextStrokeTransparency = 0.7
-prompt.Parent = pickupBillboard
+prompt.Visible = false
+prompt.Parent = touchGui
 local promptCorner = Instance.new("UICorner")
 promptCorner.CornerRadius = UDim.new(0, 7)
 promptCorner.Parent = prompt
@@ -159,8 +152,16 @@ RunService.RenderStepped:Connect(function()
 	prompt.Text = if Responsive.IsTouch() then "PICK UP" else "E  ·  PICK UP"
 	pickupOutline.Adornee = target
 	pickupOutline.Enabled = target ~= nil
-	pickupBillboard.Adornee = target
-	pickupBillboard.Enabled = target ~= nil
+	local camera = Workspace.CurrentCamera
+	local viewportPoint = Vector3.zero
+	local onScreen = false
+	if target and camera then
+		viewportPoint, onScreen = camera:WorldToViewportPoint(target.Position + Vector3.new(0, 1.2, 0))
+	end
+	prompt.Visible = target ~= nil and onScreen and viewportPoint.Z > 0
+	if prompt.Visible then
+		prompt.Position = UDim2.fromOffset(viewportPoint.X, viewportPoint.Y - 22)
+	end
 	if not canUseRock() and player:GetAttribute("BallEquipped") == true then
 		player:SetAttribute("BallEquipped", false)
 	end

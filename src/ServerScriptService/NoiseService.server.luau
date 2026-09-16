@@ -104,10 +104,8 @@ RunService.Heartbeat:Connect(function(dt)
 		-- target noise scales with how fast you're actually going, not just the key you hold
 		local speedFactor = math.clamp(speed / Config.WalkSpeed, 0, 1.3)
 		local target = math.clamp((NOISE_TARGET[st.move] or 0) * (moving and speedFactor or 0), 0, 100)
-		-- Objectives such as repairing a relay or cranking the escape gate are
-		-- deliberately loud even when the survivor is standing still. GameService
-		-- supplies a short override so human Blind Ones also see that survivor's
-		-- sound silhouette through the forest and buildings.
+		-- Cranking the escape gate is deliberately loud even while standing still.
+		-- Generator sound is positional and does not raise the survivor's meter.
 		local overrideUntil = player:GetAttribute("NoiseOverrideUntil")
 		local overrideLevel = player:GetAttribute("NoiseOverrideLevel")
 		if typeof(overrideUntil) == "number" and typeof(overrideLevel) == "number" and os.clock() < overrideUntil then

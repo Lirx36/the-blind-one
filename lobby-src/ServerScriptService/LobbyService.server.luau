@@ -18,7 +18,7 @@ local ORIGIN = Vector3.new(0, 420, 0)
 local GAME_PLACE_ID = 88782261737370
 local PRIVATE_CAPACITY_MIN = 1
 local PRIVATE_CAPACITY_MAX = 6
-local PUBLIC_CAPACITY = 10
+local PUBLIC_CAPACITY = 6
 local PUBLIC_COUNTDOWN = 15
 
 local function ensureSafetySpawn(): SpawnLocation
@@ -124,7 +124,11 @@ local function voteCounts(queue: Queue): (number, number)
 	local playerVotes = 0
 	for member in queue.members do
 		local vote = queue.votes[member]
-		if vote == "Player" then playerVotes += 1 else botVotes += 1 end
+		if vote == "Player" then
+			playerVotes += 1
+		elseif vote == "Bot" then
+			botVotes += 1
+		end
 	end
 	return botVotes, playerVotes
 end
@@ -292,6 +296,10 @@ local function launch(queue: Queue)
 	for member in queue.members do if member.Parent == Players then table.insert(party, member) end end
 	local partyUserIds = {}
 	for _, member in ipairs(party) do table.insert(partyUserIds, member.UserId) end
+	-- Choose from the final departure roster, not the order players load into
+	-- the destination server. Every member, including the host, gets one entry.
+	local blindOneUserId = if queue.blindMode == "Player" and #party >= 2
+		then party[Random.new():NextInteger(1, #party)].UserId else nil
 	LobbyElevators.BeginDeparture(queue.id)
 	for _, member in ipairs(party) do
 		local root = member.Character and member.Character:FindFirstChild("HumanoidRootPart")
@@ -318,6 +326,7 @@ local function launch(queue: Queue)
 	options:SetTeleportData({
 		DirectMatch = true,
 		BlindOneMode = queue.blindMode,
+		BlindOneUserId = blindOneUserId,
 		ExpectedPlayers = #party,
 		PartyUserIds = partyUserIds,
 		ElevatorQueueId = queue.id,
@@ -360,7 +369,9 @@ local function joinQueue(player: Player, queue: Queue)
 	end
 	removeFromQueue(player)
 	queue.members[player] = true
-	queue.votes[player] = "Bot"
+	-- Joining does not cast a ballot. Solo private parties are forced to BOT
+	-- when their capacity is changed to one or when the descent begins.
+	queue.votes[player] = nil
 	playerQueue[player] = queue
 	player:SetAttribute("QueueId", queue.id)
 	if queue.kind == "Private" and not queue.ownerUserId then queue.ownerUserId = player.UserId end
@@ -553,7 +564,7 @@ local function buildHub()
 	end
 	local publicPad = makePart(folder, "PublicQueue", Vector3.new(128,0.6,30), CFrame.new(ORIGIN + Vector3.new(0,1,68)), Color3.fromRGB(240, 151, 67), Enum.Material.SmoothPlastic)
 	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
-	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", "0/10  •  WALK IN TO JOIN")
+	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", ("0/%d  •  WALK IN TO JOIN"):format(PUBLIC_CAPACITY))
 	queues.Public = publicQueue
 	local touchDebounce: { [Player]: number } = {}
 	publicPad.Touched:Connect(function(hit)
@@ -664,7 +675,7 @@ local function buildBunkerHub()
 	local publicPad = makePart(folder, "PublicQueue", Vector3.new(50, 0.35, 21), CFrame.new(ORIGIN + Vector3.new(0, 2.25, 68)), Color3.fromRGB(177, 39, 33), Enum.Material.Neon)
 	publicPad.Transparency = 0.78
 	local publicQueue: Queue = { id = "Public", kind = "Public", ownerUserId = nil, capacity = PUBLIC_CAPACITY, friendsOnly = false, blindMode = "Bot", members = {}, votes = {}, countdown = nil, generation = 0, launching = false, label = nil }
-	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", "0/10  •  HOLD E TO JOIN")
+	publicQueue.label = addWorldLabel(publicPad, "PUBLIC DESCENT", ("0/%d  •  HOLD E TO JOIN"):format(PUBLIC_CAPACITY))
 	queues.Public = publicQueue
 	local publicPrompt = Instance.new("ProximityPrompt")
 	publicPrompt.ActionText = "Enter public matchmaking"
@@ -779,7 +790,23 @@ Players.PlayerRemoving:Connect(function(player)
 	removeFromQueue(player)
 end)
 
+local function updatePublicCapacitySigns()
+	local bunker = workspace:FindFirstChild("BunkerLobby")
+	if not bunker then return end
+	local wayfinding = bunker:FindFirstChild("WayfindingSigns")
+	local publicWayfinder = wayfinding and wayfinding:FindFirstChild("PublicWayfinder")
+	for _, root in { bunker:FindFirstChild("PublicElevatorSign"), publicWayfinder } do
+		if not root then continue end
+		for _, descendant in root:GetDescendants() do
+			if descendant:IsA("TextLabel") then
+				descendant.Text = descendant.Text:gsub("CAPACITY %d+", "CAPACITY " .. PUBLIC_CAPACITY)
+			end
+		end
+	end
+end
+
 LobbyElevators.Ensure()
+updatePublicCapacitySigns()
 buildBunkerHub()
 enableDetailedDecorCollision()
 workspace:SetAttribute("BlindOneMode", "Bot")

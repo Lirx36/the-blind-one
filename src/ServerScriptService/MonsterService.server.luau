@@ -242,6 +242,7 @@ type Heard = {
 	at: number,
 	player: Player?,
 	arrivedAt: number?,
+	generator: boolean?,
 }
 local heard: Heard? = nil
 local Hearing = require(ReplicatedStorage:WaitForChild("MonsterHearing"))
@@ -258,6 +259,7 @@ local function registerNoise(pos: Vector3, loudness: number, player: Player?)
 	local sameSound = heard and player == nil and heard.player == nil and (heard.pos-pos).Magnitude < 4
 	local oldScore = if heard then math.max(0, heard.strength - (now-heard.at)*6) else 0
 	if not heard or sameTarget or sameSound
+		or (heard.generator and player ~= nil)
 		or Hearing.ShouldSwitch(oldScore, strength, now-selectedAt, Config) then
 		local arrived = if heard and (heard.pos-pos).Magnitude < 2 then heard.arrivedAt else nil
 		if not sameTarget and not sameSound then selectedAt = now end
@@ -265,10 +267,19 @@ local function registerNoise(pos: Vector3, loudness: number, player: Player?)
 	end
 end
 
-noiseBindable.Event:Connect(function(pos: Vector3, loudness: number, sourcePlayer: Player?)
+noiseBindable.Event:Connect(function(pos: Vector3, loudness: number, sourcePlayer: Player?, kind: string?)
 	-- Player footsteps are evaluated together in pollPlayers; anonymous
 	-- footsteps used to overwrite the chosen survivor several times a second.
 	if sourcePlayer then return end
+	if kind == "GeneratorAlert" then
+		if not monster.Parent then return end
+		-- The generator gives the bot a definite location even when it is beyond
+		-- normal hearing range. An active survivor pursuit still takes priority.
+		if heard and heard.player and os.clock() - heard.at <= Config.MonsterHuntGrace then return end
+		heard = {pos=pos, strength=100, at=os.clock(), player=nil, arrivedAt=nil, generator=true}
+		selectedAt = os.clock()
+		return
+	end
 	registerNoise(pos, loudness, nil)
 end)
 
@@ -351,16 +362,16 @@ local function decide()
 			-- Investigation time starts when the monster actually reaches the
 			-- sound. Previously it expired while travelling, then resumed its old
 			-- patrol goal, which often looked like it remembered a silent player.
-			if distToHeard <= 4.5 then
+			if distToHeard <= (if heard.generator then 8 else 4.5) then
 				if not heard.arrivedAt then
 					heard.arrivedAt = now
 				end
-				if now - (heard.arrivedAt :: number) >= Config.MonsterInvestigateTime then
+				if now - (heard.arrivedAt :: number) >= (if heard.generator then 2.5 else Config.MonsterInvestigateTime) then
 					heard = nil
 					state = "wander"
 					wanderGoal = nil
 				end
-			elseif age > Config.BotSoundMemory then
+			elseif age > (if heard.generator then 90 else Config.BotSoundMemory) then
 				-- Abandon an unreachable sound eventually instead of pursuing it
 				-- forever, but never resume a patrol target from before the sound.
 				heard = nil
@@ -377,6 +388,11 @@ local function decide()
 
 	if state == "hunt" or state == "investigate" then
 		targetSpeed = (state == "hunt") and Config.MonsterHuntSpeed or Config.MonsterInvestigateSpeed
+		-- Stop beside the generator during inspection rather than pushing into it.
+		if heard and heard.generator and heard.arrivedAt then
+			targetSpeed = 0
+			return root.Position
+		end
 		return heard and heard.pos or root.Position
 	end
 
@@ -534,7 +550,7 @@ task.spawn(function()
 			monster:SetAttribute("NavigationGoal", goal)
 			local needsRoute = moved or stale or missingRoute or routeDirty
 				or (finishedRoute and (goal-root.Position).Magnitude > 4.5)
-			if needsRoute and not computing and os.clock()-lastCompute >= 0.75 then
+			if targetSpeed > 0 and needsRoute and not computing and os.clock()-lastCompute >= 0.75 then
 				computing = true
 				local ok, problem = pcall(recompute, goal)
 				computing = false
@@ -574,6 +590,11 @@ RunService.Heartbeat:Connect(function(dt)
 		return
 	end
 	if photoFrozen then
+		monster:SetAttribute("VisualMoveSpeed", 0)
+		return
+	end
+	if targetSpeed == 0 then
+		currentSpeed = 0
 		monster:SetAttribute("VisualMoveSpeed", 0)
 		return
 	end

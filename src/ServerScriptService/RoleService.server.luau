@@ -12,6 +12,20 @@ local MonsterAppearance = require(script.Parent:WaitForChild("MonsterAppearance"
 
 local rng = Random.new()
 local ORIGINAL_ANIMATE_ENABLED = "BlindOneOriginalAnimateEnabled"
+local selectedHumanHunterId: number? = nil
+
+local function chosenFromTeleport(players: { Player }): Player?
+	for _, member in players do
+		local data = member:GetJoinData().TeleportData
+		local chosenId = if typeof(data) == "table" then data.BlindOneUserId else nil
+		if typeof(chosenId) == "number" then
+			for _, candidate in players do
+				if candidate.UserId == chosenId then return candidate end
+			end
+		end
+	end
+	return nil
+end
 
 local function farMonsterSpawn(): Vector3?
 	local generatedMap = workspace:FindFirstChild("GeneratedMap")
@@ -131,23 +145,46 @@ local function refreshRoles()
 	end
 	if #players == 0 then return end
 	local playerControlled = workspace:GetAttribute("BlindOneMode") == "Player"
-	if not Config.PlayerBlindOneEnabled or not playerControlled or #players < 2 then
+	-- MatchBootstrap marks party members InMatch one at a time. Wait until its
+	-- arrival handoff is complete before drawing a random player from the full
+	-- party; otherwise only the first two arrivals can ever be chosen.
+	local expectedArrivals = workspace:GetAttribute("ArrivalExpected")
+	if playerControlled and typeof(expectedArrivals) == "number" and expectedArrivals > 0
+		and workspace:GetAttribute("ArrivalPhase") ~= "Complete" then
+		return
+	end
+	if not Config.PlayerBlindOneEnabled or not playerControlled then
 		for _, player in players do
 			setRole(player, "Survivor")
 		end
+		workspace:SetAttribute("BlindOneUsername", "BOT")
 		return
 	end
 
 	local chosen: Player? = nil
-	for _, player in players do
-		if player:GetAttribute("Role") == "BlindOne" then
-			chosen = player
-			break
+	if selectedHumanHunterId then
+		for _, member in players do
+			if member.UserId == selectedHumanHunterId then
+				chosen = member
+				break
+			end
 		end
+		if not chosen then
+			workspace:SetAttribute("BlindOneMode", "Bot")
+			workspace:SetAttribute("BlindOneUsername", "BOT")
+			workspace:SetAttribute("BlindOneBotTakeoverAt", workspace:GetServerTimeNow())
+			return
+		end
+	elseif #players < 2 then
+		for _, member in players do setRole(member, "Survivor") end
+		return
 	end
 	if not chosen then
-		chosen = players[rng:NextInteger(1, #players)]
+		chosen = chosenFromTeleport(players) or players[rng:NextInteger(1, #players)]
+		selectedHumanHunterId = chosen.UserId
+		print(("RoleService: picked %s (%d) as Blind One from %d loaded players"):format(chosen.Name, chosen.UserId, #players))
 	end
+	workspace:SetAttribute("BlindOneUsername", chosen.Name)
 	for _, player in players do
 		setRole(player, if player == chosen then "BlindOne" else "Survivor")
 	end
@@ -178,9 +215,15 @@ Players.PlayerAdded:Connect(function(player)
 	setupPlayer(player)
 	task.defer(refreshRoles)
 end)
-Players.PlayerRemoving:Connect(function()
+Players.PlayerRemoving:Connect(function(player)
+	if selectedHumanHunterId == player.UserId and workspace:GetAttribute("BlindOneMode") == "Player" then
+		workspace:SetAttribute("BlindOneMode", "Bot")
+		workspace:SetAttribute("BlindOneUsername", "BOT")
+		workspace:SetAttribute("BlindOneBotTakeoverAt", workspace:GetServerTimeNow())
+	end
 	task.delay(0.15, refreshRoles)
 end)
 
 task.defer(refreshRoles)
 workspace:GetAttributeChangedSignal("BlindOneMode"):Connect(refreshRoles)
+workspace:GetAttributeChangedSignal("ArrivalPhase"):Connect(refreshRoles)

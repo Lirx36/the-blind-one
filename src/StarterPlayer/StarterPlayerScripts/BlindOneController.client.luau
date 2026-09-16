@@ -49,6 +49,114 @@ gui.IgnoreGuiInset = true
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
+-- Through-wall generator echoes are deliberately small, like survivor sound
+-- silhouettes. White means a repair is complete; red means a temporary lockout.
+local markerGui = Instance.new("ScreenGui")
+markerGui.Name = "BlindOneGeneratorMarkers"
+markerGui.ResetOnSpawn = false
+markerGui.IgnoreGuiInset = true
+markerGui.Parent = player:WaitForChild("PlayerGui")
+local generatorMarkers: { [Instance]: BillboardGui } = {}
+local investigatedGenerators: { [Instance]: boolean } = {}
+local generatorVisitRay = RaycastParams.new()
+generatorVisitRay.FilterType = Enum.RaycastFilterType.Include
+local function canVisitGenerator(station: Instance, root: BasePart, base: BasePart): boolean
+	local map = Workspace:FindFirstChild("GeneratedMap")
+	if not map then return false end
+	generatorVisitRay.FilterDescendantsInstances = { map }
+	generatorVisitRay.RespectCanCollide = true
+	local hit = Workspace:Raycast(root.Position, base.Position - root.Position, generatorVisitRay)
+	return hit == nil or hit.Instance:IsDescendantOf(station)
+end
+local function generatorMarker(station: Instance): BillboardGui?
+	local existing = generatorMarkers[station]
+	if existing then return existing end
+	local base = if station:IsA("Model") then station.PrimaryPart else nil
+	if not base then return nil end
+	local marker = Instance.new("BillboardGui")
+	marker.Name = "GeneratorSoundMarker"
+	marker.Adornee = base
+	marker.AlwaysOnTop = true
+	marker.LightInfluence = 0
+	marker.MaxDistance = 100000
+	marker.Size = UDim2.fromOffset(42, 54)
+	marker.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+	marker.Enabled = false
+	marker.Parent = markerGui
+	local case = Instance.new("Frame")
+	case.Name = "GeneratorCase"
+	case.AnchorPoint = Vector2.new(0.5, 0)
+	case.Position = UDim2.fromScale(0.5, 0.08)
+	case.Size = UDim2.fromOffset(27, 29)
+	case.BackgroundTransparency = 1
+	case.Parent = marker
+	local outline = Instance.new("UIStroke")
+	outline.Name = "MarkerStroke"
+	outline.Color = Color3.fromRGB(225, 244, 255)
+	outline.Thickness = 2
+	outline.Parent = case
+	local bolts = Instance.new("TextLabel")
+	bolts.Name = "GeneratorCoils"
+	bolts.Size = UDim2.fromScale(1, 1)
+	bolts.BackgroundTransparency = 1
+	bolts.Font = Enum.Font.GothamBold
+	bolts.Text = "≋"
+	bolts.TextScaled = true
+	bolts.TextColor3 = outline.Color
+	bolts.Parent = case
+	local caption = Instance.new("TextLabel")
+	caption.Name = "Caption"
+	caption.Position = UDim2.new(0, 0, 0, 39)
+	caption.Size = UDim2.new(1, 0, 0, 12)
+	caption.BackgroundTransparency = 1
+	caption.Font = Enum.Font.GothamBold
+	caption.Text = "GEN"
+	caption.TextSize = 11
+	caption.TextColor3 = outline.Color
+	caption.Parent = marker
+	generatorMarkers[station] = marker
+	return marker
+end
+
+local function refreshGeneratorMarkers(isBlindOne: boolean, root: BasePart?)
+	local serverNow = Workspace:GetServerTimeNow()
+	local seen: { [Instance]: boolean } = {}
+	for _, station in CollectionService:GetTagged("GateMechanism") do
+		if not station:IsDescendantOf(Workspace) then continue end
+		seen[station] = true
+		local marker = generatorMarker(station)
+		if not marker then continue end
+		local activated = station:GetAttribute("Activated") == true
+		local lockedUntil = tonumber(station:GetAttribute("LockedUntil")) or 0
+		local locked = not activated and lockedUntil > serverNow
+		local base = (station :: Model).PrimaryPart
+		if isBlindOne and activated and not investigatedGenerators[station] and root and base
+			and (root.Position - base.Position).Magnitude < 11
+			and canVisitGenerator(station, root, base) then
+			investigatedGenerators[station] = true
+		end
+		marker.Enabled = isBlindOne and (locked or (activated and not investigatedGenerators[station]))
+		local color = if locked then Color3.fromRGB(255, 76, 67) else Color3.fromRGB(225, 244, 255)
+		local case = marker:FindFirstChild("GeneratorCase")
+		local outline = case and case:FindFirstChild("MarkerStroke")
+		local coils = case and case:FindFirstChild("GeneratorCoils")
+		local caption = marker:FindFirstChild("Caption")
+		if outline and outline:IsA("UIStroke") then outline.Color = color end
+		if coils and coils:IsA("TextLabel") then coils.TextColor3 = color end
+		if caption and caption:IsA("TextLabel") then
+			caption.Text = if locked then "LOCKED" else "GEN"
+			caption.TextColor3 = color
+		end
+	end
+	for station, marker in generatorMarkers do
+		if not seen[station] then
+			marker:Destroy()
+			generatorMarkers[station] = nil
+			investigatedGenerators[station] = nil
+		end
+	end
+end
+
 local title = Instance.new("TextLabel")
 title.AnchorPoint = Vector2.new(0.5, 0)
 title.Position = UDim2.new(0.5, 0, 0, 74)
@@ -77,8 +185,8 @@ hint.Parent = gui
 local senseLight = Instance.new("PointLight")
 senseLight.Name = "BlindSenseGlow"
 senseLight.Color = Color3.fromRGB(105, 130, 138)
-senseLight.Brightness = 3.1
-senseLight.Range = 30
+senseLight.Brightness = 1.8
+senseLight.Range = 19
 senseLight.Shadows = false
 senseLight.Enabled = false
 
@@ -422,8 +530,8 @@ end
 
 -- Only this player's lighting changes. Keep real walls and props visible so
 -- collision boundaries are readable; survivor bodies remain sound-driven below.
-local VISION_FADE_START = 17
-local VISION_DISTANCE = 30
+local VISION_FADE_START = 0
+local VISION_DISTANCE = 19
 local savedVisionLighting: {
     color: Color3, start: number, finish: number,
     ambient: Color3, outdoor: Color3, exposure: number,
@@ -459,9 +567,9 @@ local function setMapBlindness(enabled: boolean)
     end
     Lighting.FogColor = Color3.new()
     Lighting.FogStart, Lighting.FogEnd = VISION_FADE_START, VISION_DISTANCE
-    Lighting.Ambient = Color3.fromRGB(110, 118, 122)
+    Lighting.Ambient = Color3.fromRGB(65, 70, 74)
     Lighting.OutdoorAmbient = Lighting.Ambient
-    Lighting.ExposureCompensation = 0.15
+    Lighting.ExposureCompensation = 0
     for _, effect in Lighting:GetChildren() do
         if effect:IsA("PostEffect") and effect ~= vision then
             if pausedGrades[effect] == nil then pausedGrades[effect] = effect.Enabled end
@@ -506,6 +614,7 @@ RunService.RenderStepped:Connect(function(dt)
 	setMapBlindness(isBlindOne)
 	local ownCharacter = player.Character
 	local ownRoot = ownCharacter and ownCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
+	refreshGeneratorMarkers(isBlindOne, ownRoot)
 	-- The monster skin is deliberately huge and textured, but those same meshes
 	-- must not sit inside the local first-person camera. This is client-only.
 	hideOwnBlindOneVisual(ownCharacter, isBlindOne)
@@ -514,7 +623,7 @@ RunService.RenderStepped:Connect(function(dt)
 			senseLight.Parent = ownRoot
 		end
 		senseLight.Enabled = true
-		senseLight.Brightness = 3.1
+		senseLight.Brightness = 1.8
 	else
 		senseLight.Enabled = false
 		senseLight.Parent = nil

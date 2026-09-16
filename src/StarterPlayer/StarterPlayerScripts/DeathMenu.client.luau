@@ -481,17 +481,22 @@ local function showMenu()
 	if player:GetAttribute("AwaitingDeathChoice") ~= true then return end
 	if spectating then stopSpectating() end
 	local escaped = player:GetAttribute("RecoveryContext") == "Escape"
+	local hunterWon = player:GetAttribute("RecoveryContext") == "HunterVictory"
 	gui.Enabled = true
 	blackout.Visible = true
 	panel.Visible = true
 	spectateOverlay.Visible = false
-	eyebrow.Text = if escaped then "EXTRACTION TERMINAL  //  OPERATIVE STATUS"
+	eyebrow.Text = if hunterWon then "HUNT TERMINAL  //  MATCH RESULT"
+		elseif escaped then "EXTRACTION TERMINAL  //  OPERATIVE STATUS"
 		else "CASUALTY TERMINAL  //  OPERATIVE STATUS"
-	title.Text = if escaped then "YOU ESCAPED THE HOLLOW" else "YOU WERE HEARD"
-	titleConstraint.MinTextSize = if escaped then 15 else 22
-	message.Text = if escaped then "Extraction confirmed. Select your next protocol."
+	title.Text = if hunterWon then "THE BLIND ONE WINS" elseif escaped then "YOU ESCAPED THE HOLLOW" else "YOU WERE HEARD"
+	titleConstraint.MinTextSize = if escaped or hunterWon then 15 else 22
+	message.Text = if hunterWon then "Every survivor has been lost. The Hollow belongs to you."
+		elseif escaped then "Extraction confirmed. Select your next protocol."
 		else "Vital signal lost. Select an available recovery protocol."
-	optionsLabel.Text = if escaped then "POST-ESCAPE OPTIONS" else "RECOVERY OPTIONS"
+	optionsLabel.Text = if hunterWon then "MATCH COMPLETE" elseif escaped then "POST-ESCAPE OPTIONS" else "RECOVERY OPTIONS"
+	respawnButton.Visible = not hunterWon
+	spectateButton.Visible = not hunterWon
 	message.TextColor3 = Color3.fromRGB(151, 160, 158)
 	requestPending = false
 	updateRespawnButton()
@@ -576,10 +581,23 @@ end)
 player:GetAttributeChangedSignal("RespawnsRemaining"):Connect(updateRespawnButton)
 player:GetAttributeChangedSignal("AwaitingDeathChoice"):Connect(function()
 	if player:GetAttribute("AwaitingDeathChoice") == true
-		and player:GetAttribute("RecoveryContext") == "Escape" then
+		and (player:GetAttribute("RecoveryContext") == "Escape"
+			or player:GetAttribute("RecoveryContext") == "HunterVictory") then
 		task.defer(showMenu)
 	end
 end)
+player:GetAttributeChangedSignal("RecoveryContext"):Connect(function()
+	if player:GetAttribute("RecoveryContext") == "HunterVictory"
+		and player:GetAttribute("AwaitingDeathChoice") == true then
+		task.defer(showMenu)
+	end
+end)
+
+-- Attribute replication may have finished before this script connected.
+if player:GetAttribute("RecoveryContext") == "HunterVictory"
+	and player:GetAttribute("AwaitingDeathChoice") == true then
+	task.defer(showMenu)
+end
 
 local function watchDeath(character: Model)
 	player:SetAttribute("DeathJumpscareFinished", false)

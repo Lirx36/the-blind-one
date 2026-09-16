@@ -643,6 +643,7 @@ local function updateQueue(queue: any)
 	local botVotes = queue.botVotes or 0
 	local playerVotes = queue.playerVotes or 0
 	modeHint.Text = if isSolo then "BOT REQUIRED  //  PLAYER LOCKED"
+		elseif botVotes + playerVotes == 0 then "NO VOTES  //  RANDOM ON DESCENT"
 		elseif botVotes == playerVotes then "DEADLOCK  //  RANDOM ON DESCENT"
 		elseif botVotes > playerVotes then ("BOT MAJORITY  //  +%d"):format(botVotes - playerVotes)
 		else ("PLAYER MAJORITY  //  +%d"):format(playerVotes - botVotes)

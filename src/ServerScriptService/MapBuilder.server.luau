@@ -19,6 +19,7 @@ map:SetAttribute("MapVersion", MAP_VERSION)
 map:SetAttribute("MapKind", "Maze")
 map:SetAttribute("MechanismsActive", 0)
 map:SetAttribute("MechanismsTotal", 5)
+map:SetAttribute("MechanismsAvailable", 6)
 map:SetAttribute("GateOpen", false)
 map:SetAttribute("Ready", false)
 map.Parent = Workspace
@@ -444,7 +445,7 @@ local generatorPositions: {Vector3}={}
 if #generatorCandidates>0 then
 	table.insert(generatorPositions,table.remove(generatorCandidates,generatorRng:NextInteger(1,#generatorCandidates)))
 end
-while #generatorPositions<5 and #generatorCandidates>0 do
+while #generatorPositions<6 and #generatorCandidates>0 do
 	local ranked={}
 	for index,candidate in generatorCandidates do
 		local nearest=math.huge

@@ -693,3 +693,15 @@ User confirmed the repaired V5 limp and limb movement work naturally. Restored 2
 - Reused survivor objective banner for persistent red "You are the blind one" title, hunter directive, and sound/catch tip. Same Garamond font, reveal animation, divider, and responsive layout. Survivor progress/inventory remain role-specific.
 - All source Luau compilation, both Rojo builds, 60 layout cases, 34 AI checks and isolated jump-policy checks passed. Updated layout test mock for existing lobby GuiService inset usage.
 - Five changed scripts synced to main Studio and readback verified. User handles Play and publishing.
+
+## 2026-09-16 - Generator alert review
+- Reviewed generator repair noise changes in GameService/NoiseService and bot integration. Repair no longer writes personal noise overrides or sends periodic repair pulses; completion/failure lock each emit one anonymous GeneratorAlert.
+- Fixed MonsterService: stale player sound memory no longer discards generator alerts indefinitely; an audible survivor can interrupt generator investigation immediately; bot pauses at the inspection radius instead of continuing toward machine center. Mover stops immediately during inspection and avoids unnecessary route computation.
+- Fresh player pursuit still takes priority. Inspection lasts 2.5 seconds; unreachable generator target expires at 90 seconds. This does not queue every generator alert when busy hunting.
+- Expanded actual-code AI tests with nine generator scenarios: 43 passed. Changed scripts compiled, main Rojo build passed. Main Studio source readback matches MonsterService, GameService and NoiseService. User Play test still required; no publish/push performed.
+
+## 2026-09-16 - Review six multiplayer features
+- Reviewed responsive hunter identity label, six-second bot takeover notice/role fallback, hunter victory eligibility and return-only menu, completed/locked generator markers, and six spawned/five required generator rules.
+- Fixed completed generator marker dismissal through a wall: requires an unobstructed collidable-map ray to machine before recording nearby visit. Locked markers still remain red until unlock, independent of visiting.
+- Fixed late client initialization: takeover notice displays only remaining duration and victory menu checks already-replicated outcome context on startup.
+- Added tests/run_match_feature_checks.py: 12 actual-code cases for notice timing, marker obstruction and victory eligibility. All 60 layout and 43 AI cases passed, all source compiled and main Rojo build passed. Three client scripts synced/readback verified. No Play/publish/push; user tests full multiplayer and device rendering.

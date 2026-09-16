@@ -21,6 +21,69 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = player:WaitForChild("PlayerGui")
 
+local hunterStatus = Instance.new("TextLabel")
+hunterStatus.Name = "BlindOneStatus"
+hunterStatus.AnchorPoint = Vector2.new(1, 0)
+hunterStatus.BackgroundColor3 = Color3.fromRGB(8, 12, 14)
+hunterStatus.BackgroundTransparency = 0.45
+hunterStatus.BorderSizePixel = 0
+hunterStatus.Font = Enum.Font.GothamBold
+hunterStatus.TextColor3 = Color3.fromRGB(226, 232, 231)
+hunterStatus.TextXAlignment = Enum.TextXAlignment.Center
+hunterStatus.TextScaled = true
+hunterStatus.TextWrapped = true
+hunterStatus.ZIndex = 12
+hunterStatus.Parent = gui
+local hunterStatusCorner = Instance.new("UICorner")
+hunterStatusCorner.CornerRadius = UDim.new(0, 7)
+hunterStatusCorner.Parent = hunterStatus
+local hunterStatusConstraint = Instance.new("UITextSizeConstraint")
+hunterStatusConstraint.MinTextSize = 11
+hunterStatusConstraint.MaxTextSize = 19
+hunterStatusConstraint.Parent = hunterStatus
+local hunterStatusStroke = Instance.new("UIStroke")
+hunterStatusStroke.Color = Color3.fromRGB(99, 38, 35)
+hunterStatusStroke.Transparency = 0.2
+hunterStatusStroke.Parent = hunterStatus
+
+local takeoverNotice = Instance.new("TextLabel")
+takeoverNotice.Name = "BotTakeoverNotice"
+takeoverNotice.AnchorPoint = Vector2.new(0.5, 0)
+takeoverNotice.BackgroundColor3 = Color3.fromRGB(32, 10, 10)
+takeoverNotice.BackgroundTransparency = 0.1
+takeoverNotice.BorderSizePixel = 0
+takeoverNotice.Font = Enum.Font.GothamBold
+takeoverNotice.TextColor3 = Color3.fromRGB(255, 190, 176)
+takeoverNotice.TextScaled = true
+takeoverNotice.TextWrapped = true
+takeoverNotice.Text = "The Blind One has left the game. Switching to BOT."
+takeoverNotice.Visible = false
+takeoverNotice.ZIndex = 14
+takeoverNotice.Parent = gui
+local noticeCorner = Instance.new("UICorner")
+noticeCorner.CornerRadius = UDim.new(0, 7)
+noticeCorner.Parent = takeoverNotice
+local noticeConstraint = Instance.new("UITextSizeConstraint")
+noticeConstraint.MinTextSize = 12
+noticeConstraint.MaxTextSize = 19
+noticeConstraint.Parent = takeoverNotice
+local noticeUntil = 0
+local function updateHunterName()
+	local username = workspace:GetAttribute("BlindOneUsername")
+	hunterStatus.Text = "The Blind One: " .. (if typeof(username) == "string" and username ~= "" and username ~= "BOT" then username else "Bot")
+end
+updateHunterName()
+workspace:GetAttributeChangedSignal("BlindOneUsername"):Connect(updateHunterName)
+local function updateTakeoverNotice()
+	local takeoverAt = workspace:GetAttribute("BlindOneBotTakeoverAt")
+	if typeof(takeoverAt) == "number" then
+		local remaining = math.clamp(6 - (workspace:GetServerTimeNow() - takeoverAt), 0, 6)
+		noticeUntil = os.clock() + remaining
+	end
+end
+workspace:GetAttributeChangedSignal("BlindOneBotTakeoverAt"):Connect(updateTakeoverNotice)
+updateTakeoverNotice()
+
 -- hide the backpack UI (the flashlight is a built-in viewmodel) and mouse cursor
 pcall(function()
 	game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
@@ -492,6 +555,9 @@ end)
 RunService.RenderStepped:Connect(function()
 	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
 	local isSurvivor = player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "Survivor"
+	hunterStatus.Visible = isSurvivor and (workspace:GetAttribute("BlindOneMode") ~= "Player"
+		or workspace:GetAttribute("BlindOneUsername") ~= nil)
+	takeoverNotice.Visible = isSurvivor and os.clock() < noticeUntil
 	local isPhotoMode = player:GetAttribute("PhotoModeActive") == true
 	revealObjective()
 	objectiveBanner.Visible = (isSurvivor or (isBlindOne and player:GetAttribute("InMatch") == true)) and objectiveShown
@@ -534,6 +600,15 @@ end)
 Responsive.Watch(gui, function(size, touch)
 	local compact = touch or size.X < 1000 or size.Y < 650
 	local short = size.Y < 400
+	-- Scale these notices by the usable screen's shorter edge, so desktop
+	-- text grows without making a wide landscape phone use desktop sizing.
+	local noticeScale = math.clamp(math.min(size.X, size.Y) / 900, 0.6, 1.4)
+	hunterStatus.Size = UDim2.fromOffset(math.min(size.X - 12, math.floor(320 * noticeScale)), math.floor(40 * noticeScale))
+	hunterStatus.Position = UDim2.new(1, -6, 0, 4)
+	hunterStatusConstraint.MaxTextSize = math.floor(24 * noticeScale)
+	takeoverNotice.Size = UDim2.fromOffset(math.min(size.X - 32, math.floor(780 * noticeScale)), math.floor(60 * noticeScale))
+	noticeConstraint.MaxTextSize = math.floor(24 * noticeScale)
+	takeoverNotice.Position = UDim2.new(0.5, 0, 0, if compact then (if short then 143 else 177) else 139)
 	-- Touch stays inside the physical device safe area. Desktop deliberately
 	-- ignores the Core UI top inset because the centered banner does not overlap
 	-- Roblox's top-left controls and looked too low when that inset was applied.
