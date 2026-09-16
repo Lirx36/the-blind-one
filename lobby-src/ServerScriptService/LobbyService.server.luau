@@ -15,6 +15,9 @@ local actionRemote = Remotes.LobbyAction
 local stateRemote = Remotes.LobbyState
 
 local ORIGIN = Vector3.new(0, 420, 0)
+local function facingPublicElevator(position: Vector3): CFrame
+	return CFrame.lookAt(position, position + Vector3.new(0, 0, 1))
+end
 local GAME_PLACE_ID = 88782261737370
 local PRIVATE_CAPACITY_MIN = 1
 local PRIVATE_CAPACITY_MAX = 6
@@ -31,7 +34,7 @@ local function ensureSafetySpawn(): SpawnLocation
 		spawnLocation.Parent = workspace
 	end
 	spawnLocation.Size = Vector3.new(8, 1, 8)
-	spawnLocation.CFrame = CFrame.new(ORIGIN + Vector3.new(0, 3, -70))
+	spawnLocation.CFrame = facingPublicElevator(ORIGIN + Vector3.new(0, 3, -70))
 	spawnLocation.Transparency = 1
 	spawnLocation.CanCollide = false
 	spawnLocation.CanQuery = false
@@ -64,7 +67,6 @@ type Queue = {
 local queues: { [string]: Queue } = {}
 local playerQueue: { [Player]: Queue } = {}
 local hubSpawn: BasePart
-local menuHolding: BasePart
 
 local function makePart(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
 	local object = Instance.new("Part")
@@ -190,7 +192,7 @@ local function stateFor(player: Player)
 		}
 	end
 	return {
-		phase = if player:GetAttribute("InMatch") == true then "Match" elseif player:GetAttribute("InHub") == true then "Hub" else "Menu",
+		phase = if player:GetAttribute("InMatch") == true then "Match" else "Hub",
 		queue = queueData,
 	}
 end
@@ -530,16 +532,9 @@ local function buildHub()
 	-- Detailed park props are persisted in Workspace.LobbyDetailedDecor.
 	-- They come from cleaned Toolbox models instead of primitive placeholders.
 
-	hubSpawn = makePart(folder, "HubSpawn", Vector3.new(4,1,4), CFrame.new(ORIGIN + Vector3.new(0,3,-76)), stone, Enum.Material.SmoothPlastic)
+	hubSpawn = makePart(folder, "HubSpawn", Vector3.new(4,1,4), facingPublicElevator(ORIGIN + Vector3.new(0,3,-76)), stone, Enum.Material.SmoothPlastic)
 	hubSpawn.Transparency = 1
 	hubSpawn.CanCollide = false
-	menuHolding = makePart(folder, "MenuHolding", Vector3.new(4,1,4), CFrame.new(ORIGIN + Vector3.new(0,3,-90)), stone, Enum.Material.SmoothPlastic)
-	menuHolding.Transparency = 1
-	menuHolding.CanCollide = false
-	local camera = makePart(folder, "MenuCamera", Vector3.one, CFrame.new(ORIGIN + Vector3.new(62,20,-76)), stone, Enum.Material.SmoothPlastic)
-	camera.Transparency = 1
-	camera.CanCollide = false
-	camera.CFrame = CFrame.lookAt(camera.Position, ORIGIN + Vector3.new(0,8,-6))
 	local privatePositions = { Vector3.new(-56,1,18), Vector3.new(0,1,18), Vector3.new(56,1,18) }
 	for index, offset in privatePositions do
 		local padColors = { Color3.fromRGB(77, 156, 212), Color3.fromRGB(110, 184, 126), Color3.fromRGB(168, 116, 211) }
@@ -633,16 +628,9 @@ local function buildBunkerHub()
 	folder.Parent = workspace
 	local hiddenColor = Color3.fromRGB(50, 58, 61)
 
-	hubSpawn = makePart(folder, "HubSpawn", Vector3.new(4, 1, 4), CFrame.new(ORIGIN + Vector3.new(0, 3, -70)), hiddenColor, Enum.Material.SmoothPlastic)
+	hubSpawn = makePart(folder, "HubSpawn", Vector3.new(4, 1, 4), facingPublicElevator(ORIGIN + Vector3.new(0, 3, -70)), hiddenColor, Enum.Material.SmoothPlastic)
 	hubSpawn.Transparency = 1
 	hubSpawn.CanCollide = false
-	menuHolding = makePart(folder, "MenuHolding", Vector3.new(4, 1, 4), CFrame.new(ORIGIN + Vector3.new(0, 3, -70)), hiddenColor, Enum.Material.SmoothPlastic)
-	menuHolding.Transparency = 1
-	menuHolding.CanCollide = false
-	local camera = makePart(folder, "MenuCamera", Vector3.one, CFrame.new(ORIGIN + Vector3.new(25, 11, -80)), hiddenColor, Enum.Material.SmoothPlastic)
-	camera.Transparency = 1
-	camera.CanCollide = false
-	camera.CFrame = CFrame.lookAt(camera.Position, ORIGIN + Vector3.new(0, 8, -46))
 
 	local privatePositions = {
 		Vector3.new(84, 2.25, -32),
@@ -737,8 +725,8 @@ local function moveCharacter(player: Player, character: Model)
 		end
 		return
 	end
-	character:PivotTo((if player:GetAttribute("InHub") == true then hubSpawn else menuHolding).CFrame + Vector3.new(0,4,0))
-	root.Anchored = player:GetAttribute("InHub") ~= true
+	character:PivotTo(hubSpawn.CFrame + Vector3.new(0, 4, 0))
+	root.Anchored = false
 end
 
 local function setupPlayer(player: Player)
@@ -747,7 +735,7 @@ local function setupPlayer(player: Player)
 	local teleportData = joinData.TeleportData
 	local direct = typeof(teleportData) == "table" and teleportData.DirectMatch == true
 	player:SetAttribute("Role", "")
-	player:SetAttribute("InHub", false)
+	player:SetAttribute("InHub", not direct)
 	player:SetAttribute("InMatch", direct)
 	if direct then workspace:SetAttribute("BlindOneMode", teleportData.BlindOneMode == "Player" and "Player" or "Bot") end
 	player.CharacterAdded:Connect(function(character) task.defer(moveCharacter, player, character) end)
@@ -757,14 +745,7 @@ end
 
 actionRemote.OnServerEvent:Connect(function(player: Player, action: string, value: any)
 	local queue = playerQueue[player]
-	if action == "EnterHub" and player:GetAttribute("InMatch") ~= true then
-		player:SetAttribute("InHub", true)
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if root and root:IsA("BasePart") then root.Anchored = false end
-		if character then character:PivotTo(hubSpawn.CFrame + Vector3.new(0,4,0)) end
-		broadcast()
-	elseif action == "Leave" then
+	if action == "Leave" then
 		removeFromQueue(player)
 	elseif action == "Capacity" and queue and queue.kind == "Private" and queue.ownerUserId == player.UserId and typeof(value) == "number" then
 		queue.capacity = math.clamp(math.floor(value), math.max(PRIVATE_CAPACITY_MIN, queueCount(queue)), PRIVATE_CAPACITY_MAX)

@@ -1,6 +1,6 @@
 --!strict
 local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
--- Title screen, physical hub guidance, and queue configuration UI.
+-- Physical hub guidance and queue configuration UI.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -59,52 +59,6 @@ local function button(parent: Instance, value: string, position: UDim2, size: UD
 	item.MouseLeave:Connect(function() TweenService:Create(item, TweenInfo.new(0.14), { BackgroundColor3 = Color3.fromRGB(12, 16, 17) }):Play() end)
 	return item
 end
-
-local menuShade = Instance.new("Frame")
-menuShade.Size = UDim2.fromScale(1, 1)
-menuShade.BackgroundColor3 = Color3.new()
-menuShade.BackgroundTransparency = 0.3
-menuShade.BorderSizePixel = 0
-menuShade.Parent = gui
-local gradient = Instance.new("UIGradient")
-gradient.Transparency = NumberSequence.new({
-	NumberSequenceKeypoint.new(0, 0.02),
-	NumberSequenceKeypoint.new(0.48, 0.35),
-	NumberSequenceKeypoint.new(1, 0.08),
-})
-gradient.Parent = menuShade
-
-local menu = Instance.new("CanvasGroup")
-menu.AnchorPoint = Vector2.new(0, 0.5)
-menu.Position = UDim2.new(0, 70, 0.5, 0)
-menu.Size = UDim2.fromOffset(510, 370)
-menu.BackgroundTransparency = 1
-menu.Parent = menuShade
-local eyebrow = text(menu, "AN ANALOG HORROR EXPERIENCE", 11, Enum.Font.GothamMedium)
-eyebrow.Position = UDim2.fromOffset(4, 38)
-eyebrow.Size = UDim2.fromOffset(470, 20)
-eyebrow.TextXAlignment = Enum.TextXAlignment.Left
-eyebrow.TextColor3 = Color3.fromRGB(129, 146, 146)
-local title = text(menu, "THE\nBLIND ONE", 58, Enum.Font.Garamond)
-title.Position = UDim2.fromOffset(0, 60)
-title.Size = UDim2.fromOffset(490, 145)
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.TextYAlignment = Enum.TextYAlignment.Top
-title.TextColor3 = Color3.fromRGB(199, 35, 29)
-title.TextStrokeTransparency = 0.12
-local rule = Instance.new("Frame")
-rule.Position = UDim2.fromOffset(2, 213)
-rule.Size = UDim2.fromOffset(370, 2)
-rule.BackgroundColor3 = Color3.fromRGB(161, 31, 26)
-rule.BorderSizePixel = 0
-rule.Parent = menu
-local tagline = text(menu, "It cannot see you.  It can hear everything.", 15, Enum.Font.Garamond)
-tagline.Position = UDim2.fromOffset(4, 232)
-tagline.Size = UDim2.fromOffset(450, 30)
-tagline.TextXAlignment = Enum.TextXAlignment.Left
-tagline.TextColor3 = Color3.fromRGB(168, 175, 171)
-local playButton = button(menu, "PLAY", UDim2.fromOffset(2, 292), UDim2.fromOffset(250, 58))
-playButton.TextSize = 18
 
 local hubHint = Instance.new("CanvasGroup")
 hubHint.AnchorPoint = Vector2.new(0.5, 0)
@@ -486,8 +440,6 @@ Responsive.Watch(gui, function(size, touch)
 	panelShadow.Position = panel.Position
 	panelShadow.Size = UDim2.fromOffset(width*panelScale.Scale,contentHeight*panelScale.Scale)
 	panelShadow.AnchorPoint = panel.AnchorPoint
-	menu.Position = UDim2.new(0, if size.X<800 then 16 else 70, 0.5, 0)
-	Responsive.Scale(menu).Scale = math.min(1,(size.X-32)/510,(size.Y-16)/370)
 	-- The Core UI safe inset is intentionally removed from this centered banner
 	-- on touch screens. It can sit beside the top-left Roblox controls instead of
 	-- consuming a large strip below them. Uniform scaling keeps the title/body
@@ -501,7 +453,6 @@ Responsive.Watch(gui, function(size, touch)
 	Responsive.Scale(elevatorOverlay).Scale = math.min(1,(size.X-24)/650)
 end)
 
-local currentState: any = nil
 local currentQueue: any = nil
 local departureActive = false
 local suspendedGuis: { [ScreenGui]: boolean } = {}
@@ -693,11 +644,6 @@ local function updateQueue(queue: any)
 	end
 end
 
-playButton.Activated:Connect(function()
-	playButton.Active = false
-	playButton.Text = "ENTERING..."
-	actionRemote:FireServer("EnterHub")
-end)
 minus.Activated:Connect(function() if currentQueue then actionRemote:FireServer("Capacity", currentQueue.capacity - 1) end end)
 plus.Activated:Connect(function() if currentQueue then actionRemote:FireServer("Capacity", currentQueue.capacity + 1) end end)
 access.Activated:Connect(function() if currentQueue then actionRemote:FireServer("FriendsOnly", not currentQueue.friendsOnly) end end)
@@ -707,10 +653,8 @@ leave.Activated:Connect(function() actionRemote:FireServer("Leave") end)
 start.Activated:Connect(function() actionRemote:FireServer("Start") end)
 
 Remotes.LobbyState.OnClientEvent:Connect(function(state: any)
-	currentState = state
 	local phase = state.phase
 	updateQueue(state.queue)
-	menuShade.Visible = phase == "Menu" and not departureActive
 	hubHint.Visible = phase == "Hub" and state.queue == nil and not departureActive
 	if phase == "Match" then
 		gui.Enabled = false
@@ -719,19 +663,14 @@ Remotes.LobbyState.OnClientEvent:Connect(function(state: any)
 end)
 
 local cameraRestored = false
+local initialHubViewPending = true
+player.CharacterAdded:Connect(function()
+	initialHubViewPending = true
+end)
 RunService:BindToRenderStep("LobbyCamera", Enum.RenderPriority.Camera.Value + 5, function()
 	local camera = workspace.CurrentCamera
 	if not camera then return end
-	local phase = currentState and currentState.phase or "Menu"
-	if phase == "Menu" then
-		cameraRestored = false
-		local folder = workspace:FindFirstChild("GeneratedLobby")
-		local cameraPart = folder and folder:FindFirstChild("MenuCamera")
-		if cameraPart and cameraPart:IsA("BasePart") then
-			camera.CameraType = Enum.CameraType.Scriptable
-			camera.CFrame = cameraPart.CFrame * CFrame.new(math.sin(os.clock() * 0.2) * 0.32, math.sin(os.clock() * 0.29) * 0.12, 0)
-		end
-	elseif currentQueue then
+	if currentQueue then
 		cameraRestored = false
 		local bunker = workspace:FindFirstChild("BunkerLobby")
 		local elevatorRoot = bunker and bunker:FindFirstChild("QueueElevators")
@@ -743,11 +682,25 @@ RunService:BindToRenderStep("LobbyCamera", Enum.RenderPriority.Camera.Value + 5,
 			camera.CFrame = camera.CFrame:Lerp(cameraPoint.CFrame, 0.13)
 		end
 	elseif not cameraRestored then
-		cameraRestored = true
-		camera.CameraType = Enum.CameraType.Custom
-		camera.FieldOfView = 70
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-		if humanoid then camera.CameraSubject = humanoid end
+		if humanoid then
+			cameraRestored = true
+			camera.CameraType = Enum.CameraType.Custom
+			camera.FieldOfView = 70
+			camera.CameraSubject = humanoid
+		end
+	end
+	if initialHubViewPending and not currentQueue and player:GetAttribute("InHub") == true then
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		local folder = workspace:FindFirstChild("GeneratedLobby")
+		local hubSpawn = folder and folder:FindFirstChild("HubSpawn")
+		if root and root:IsA("BasePart") and hubSpawn and hubSpawn:IsA("BasePart")
+			and (root.Position - hubSpawn.Position).Magnitude < 20 then
+			local focus = root.Position + Vector3.new(0, 2, 0)
+			camera.Focus = CFrame.new(focus)
+			camera.CFrame = CFrame.lookAt(focus + Vector3.new(0, 6, -12), focus + Vector3.new(0, 0, 10))
+			initialHubViewPending = false
+		end
 	end
 end)
 
