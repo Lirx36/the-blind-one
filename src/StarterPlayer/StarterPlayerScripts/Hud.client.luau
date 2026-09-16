@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Noise meter, stamina, rock count, objective text, and a dread vignette that closes
 -- in as the monster gets near.
 local Players = game:GetService("Players")
@@ -447,6 +448,7 @@ Remotes.Dread.OnClientEvent:Connect(function(v: number)
 	dread = v
 end)
 
+local survivorDirective = "Restore the generators. Stay quiet."
 local objectiveReceived = false
 local objectiveShown = false
 local OBJECTIVE_HIDDEN_POSITION = UDim2.new(0.5, 0, 0, -112)
@@ -454,25 +456,29 @@ local OBJECTIVE_SHOWN_POSITION = UDim2.new(0.5, 0, 0, 16)
 local OBJECTIVE_TWEEN = TweenInfo.new(0.65, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 local function revealObjective()
-	if objectiveShown or not objectiveReceived then return end
-	if player:GetAttribute("Role") == "BlindOne" then return end
+	if objectiveShown then return end
+	if not objectiveReceived and player:GetAttribute("Role") ~= "BlindOne" then return end
 	if player:GetAttribute("RoleIntroComplete") ~= true then return end
 	objectiveShown = true
 	objectiveBanner.Visible = true
 	objectiveBanner.Position = OBJECTIVE_HIDDEN_POSITION
 	objectiveBanner.GroupTransparency = 1
 	objectiveRule.Size = UDim2.fromOffset(16, 2)
-	TweenService:Create(objectiveBanner, OBJECTIVE_TWEEN, {
+	local bannerTween = TweenService:Create(objectiveBanner, OBJECTIVE_TWEEN, {
 		Position = OBJECTIVE_SHOWN_POSITION,
 		GroupTransparency = 0,
-	}):Play()
+	})
+	bannerTween.Completed:Once(function()
+		objectiveBanner.Position = OBJECTIVE_SHOWN_POSITION
+	end)
+	bannerTween:Play()
 	TweenService:Create(objectiveRule, OBJECTIVE_TWEEN, {
 		Size = UDim2.fromOffset(390, 2),
 	}):Play()
 end
 
 Remotes.Objective.OnClientEvent:Connect(function(text: string)
-	objective.Text = text
+	if player:GetAttribute("Role") ~= "BlindOne" then survivorDirective = text end
 	objectiveReceived = true
 	revealObjective()
 end)
@@ -487,10 +493,18 @@ RunService.RenderStepped:Connect(function()
 	local isBlindOne = player:GetAttribute("Role") == "BlindOne"
 	local isSurvivor = player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "Survivor"
 	local isPhotoMode = player:GetAttribute("PhotoModeActive") == true
-	objectiveBanner.Visible = isSurvivor and objectiveShown
+	revealObjective()
+	objectiveBanner.Visible = (isSurvivor or (isBlindOne and player:GetAttribute("InMatch") == true)) and objectiveShown
+	objectiveTitle.Text = if isBlindOne then "You are the blind one" else "OBJECTIVE"
+	objectiveTitle.TextColor3 = if isBlindOne then Color3.fromRGB(235, 68, 65) else Color3.fromRGB(235, 238, 235)
+	objectiveEyebrow.Text = if isBlindOne then "THE HOLLOW  /  HUNTER DIRECTIVE" else "THE HOLLOW  /  SURVIVOR DIRECTIVE"
+	objectiveRule.BackgroundColor3 = if isBlindOne then Color3.fromRGB(210, 65, 62) else Color3.fromRGB(211, 221, 220)
+	objectiveMark.BackgroundColor3 = if isBlindOne then Color3.fromRGB(235, 90, 85) else Color3.fromRGB(226, 232, 230)
+	objective.Text = if isBlindOne then "Follow sound silhouettes. Catch every survivor." else survivorDirective
+	objective.TextColor3 = if isBlindOne then Color3.fromRGB(230, 165, 160) else Color3.fromRGB(220, 225, 222)
 	progressPanel.Visible = isSurvivor and objectiveShown
 	panel.Visible = isSurvivor
-	controlsPanel.Visible = isSurvivor
+	controlsPanel.Visible = isSurvivor and not Responsive.IsTouch() and gui.AbsoluteSize.X >= 1000 and gui.AbsoluteSize.Y >= 650
 	rockSlot.Visible = isSurvivor
 	local ballEquipped = isSurvivor and player:GetAttribute("BallEquipped") == true
 	rockSlotStroke.Color = if ballEquipped then Color3.fromRGB(231, 91, 50) else Color3.fromRGB(132, 151, 157)
@@ -515,4 +529,42 @@ RunService.RenderStepped:Connect(function()
 	vignette.BackgroundTransparency = if isBlindOne or isPhotoMode
 		then 1
 		else math.clamp(1 - (dread * 0.12 + pulse), 0.82, 1)
+end)
+
+Responsive.Watch(gui, function(size, touch)
+	local compact = touch or size.X < 1000 or size.Y < 650
+	local short = size.Y < 400
+	-- Touch stays inside the physical device safe area. Desktop deliberately
+	-- ignores the Core UI top inset because the centered banner does not overlap
+	-- Roblox's top-left controls and looked too low when that inset was applied.
+	gui.ScreenInsets = if touch then Enum.ScreenInsets.DeviceSafeInsets else Enum.ScreenInsets.None
+	local top = if touch then 2 else 8
+	OBJECTIVE_SHOWN_POSITION = UDim2.new(0.5,0,0,top)
+	if objectiveShown then objectiveBanner.Position = OBJECTIVE_SHOWN_POSITION end
+	local width = math.min(560, size.X - 24)
+	objectiveBanner.Size = UDim2.fromOffset(width, if short then 60 elseif compact then 72 else 104)
+	objectiveEyebrow.Visible = not compact
+	objectiveTitle.Visible = true
+	objectiveRule.Visible = true
+	objectiveTitle.Position = UDim2.fromOffset(0, if compact then 0 else 18)
+	objectiveTitle.Size = UDim2.new(1, 0, 0, if short then 23 elseif compact then 30 else 39)
+	objectiveTitle.TextSize = if short then 19 elseif compact then 23 else 32
+	objectiveRule.Position = UDim2.new(0.5, 0, 0, if short then 24 elseif compact then 31 else 56)
+	Responsive.Scale(objectiveRule).Scale = math.min(1, (width-36)/390)
+	objective.Position = UDim2.fromOffset(12, if short then 27 elseif compact then 35 else 64)
+	objective.Size = UDim2.new(1, -24, 0, 32)
+	objective.TextSize = if compact then 13 else 16
+	objective.TextWrapped = true
+	progressPanel.Position = UDim2.new(0.5, 0, 0, top + (if short then 63 elseif compact then 75 else 110))
+	Responsive.Scale(progressPanel).Scale = if compact then 0.8 else 1
+	local barScale = if compact then math.min(0.8, (size.X-104)/300) else 1
+	Responsive.Scale(panel).Scale = barScale
+	panel.AnchorPoint = Vector2.new(0.5, 1)
+	panel.Position = UDim2.new(0.5, if compact then -36 else 0, 1, -12)
+	rockSlot.AnchorPoint = Vector2.new(0, 1)
+	rockSlot.Position = UDim2.new(0.5, if compact then 300*barScale/2-26 else 164, 1, -12)
+	Responsive.Scale(rockSlot).Scale = if compact then 0.85 else 1
+	rockSlot.Size = UDim2.fromOffset(if compact then 76 else 96, 52)
+	rockKey.Text = if touch then "TAP" else "1"
+	rockKey.TextSize = if touch then 10 else 12
 end)

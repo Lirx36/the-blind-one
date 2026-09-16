@@ -69,19 +69,87 @@ for _, x in { 0.38, 0.62 } do
 end
 
 local deathText = Instance.new("TextLabel")
-deathText.AnchorPoint = Vector2.new(0.5, 1)
-deathText.Position = UDim2.new(0.5, 0, 1, -70)
-deathText.Size = UDim2.fromOffset(620, 64)
+deathText.AnchorPoint = Vector2.new(0.5, 0.5)
+deathText.Position = UDim2.fromScale(0.5, 0.48)
+deathText.Size = UDim2.new(0.82, 0, 0, 150)
 deathText.BackgroundTransparency = 1
 deathText.Font = Enum.Font.GothamBlack
 deathText.Text = "IT HEARD YOU"
-deathText.TextColor3 = Color3.fromRGB(223, 222, 208)
-deathText.TextSize = 34
+deathText.TextColor3 = Color3.fromRGB(239, 236, 224)
+deathText.TextScaled = true
 deathText.TextStrokeColor3 = Color3.fromRGB(61, 0, 0)
-deathText.TextStrokeTransparency = 0.15
+deathText.TextStrokeTransparency = 0.05
 deathText.TextTransparency = 1
-deathText.ZIndex = 8
+deathText.ZIndex = 10
 deathText.Parent = gui
+local deathTextSize = Instance.new("UITextSizeConstraint")
+deathTextSize.MinTextSize = 22
+deathTextSize.MaxTextSize = 86
+deathTextSize.Parent = deathText
+local deathTextWidth = Instance.new("UISizeConstraint")
+deathTextWidth.MaxSize = Vector2.new(980, 150)
+deathTextWidth.Parent = deathText
+
+-- A thick painted slash sits behind the title, with uneven rounded trails that
+-- read as wet red paint dripping down from the words.
+local bloodPaint = Instance.new("Frame")
+bloodPaint.Name = "BloodPaint"
+bloodPaint.AnchorPoint = Vector2.new(0.5, 0.5)
+bloodPaint.Position = UDim2.fromScale(0.5, 0.54)
+bloodPaint.Size = UDim2.new(0.78, 0, 0, 190)
+bloodPaint.BackgroundTransparency = 1
+bloodPaint.Visible = false
+bloodPaint.ZIndex = 8
+bloodPaint.Parent = gui
+local bloodWidth = Instance.new("UISizeConstraint")
+bloodWidth.MaxSize = Vector2.new(900, 190)
+bloodWidth.Parent = bloodPaint
+
+local smear = Instance.new("Frame")
+smear.AnchorPoint = Vector2.new(0.5, 0.5)
+smear.Position = UDim2.fromScale(0.5, 0.24)
+smear.Size = UDim2.new(0.92, 0, 0, 18)
+smear.BackgroundColor3 = Color3.fromRGB(126, 5, 4)
+smear.BackgroundTransparency = 0.05
+smear.BorderSizePixel = 0
+smear.ZIndex = 8
+smear.Parent = bloodPaint
+local smearCorner = Instance.new("UICorner")
+smearCorner.CornerRadius = UDim.new(1, 0)
+smearCorner.Parent = smear
+
+local dripSpecs = {
+	{ 0.12, 10, 50 }, { 0.19, 16, 92 }, { 0.29, 8, 38 },
+	{ 0.39, 13, 68 }, { 0.49, 9, 112 }, { 0.58, 17, 58 },
+	{ 0.68, 10, 84 }, { 0.79, 14, 44 }, { 0.87, 8, 72 },
+}
+for index, spec in dripSpecs do
+	local drip = Instance.new("Frame")
+	drip.Name = "PaintDrip" .. index
+	drip.AnchorPoint = Vector2.new(0.5, 0)
+	drip.Position = UDim2.new(spec[1], 0, 0, 44)
+	drip.Size = UDim2.fromOffset(spec[2], spec[3])
+	drip.BackgroundColor3 = if index % 3 == 0 then Color3.fromRGB(91, 2, 3) else Color3.fromRGB(132, 5, 5)
+	drip.BackgroundTransparency = if index % 2 == 0 then 0.08 else 0.16
+	drip.BorderSizePixel = 0
+	drip.ZIndex = 8
+	drip.Parent = bloodPaint
+	local dripCorner = Instance.new("UICorner")
+	dripCorner.CornerRadius = UDim.new(1, 0)
+	dripCorner.Parent = drip
+	local drop = Instance.new("Frame")
+	drop.AnchorPoint = Vector2.new(0.5, 0.5)
+	drop.Position = UDim2.new(0.5, 0, 1, 0)
+	drop.Size = UDim2.fromOffset(spec[2] + 5, spec[2] + 5)
+	drop.BackgroundColor3 = drip.BackgroundColor3
+	drop.BackgroundTransparency = drip.BackgroundTransparency
+	drop.BorderSizePixel = 0
+	drop.ZIndex = 8
+	drop.Parent = drip
+	local dropCorner = Instance.new("UICorner")
+	dropCorner.CornerRadius = UDim.new(1, 0)
+	dropCorner.Parent = drop
+end
 
 local glitches = {}
 for _ = 1, 12 do
@@ -107,6 +175,36 @@ impact.Volume = 0.62
 impact.PlaybackSpeed = 0.8
 impact.Parent = SoundService
 
+local hiddenScreens: { [ScreenGui]: boolean } = {}
+local screenAddedConnection: RBXScriptConnection? = nil
+
+local function hideGameplayScreens()
+	table.clear(hiddenScreens)
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not playerGui then return end
+	local function hide(instance: Instance)
+		if instance:IsA("ScreenGui") and instance ~= gui and hiddenScreens[instance] == nil then
+			hiddenScreens[instance] = instance.Enabled
+			instance.Enabled = false
+		end
+	end
+	for _, child in playerGui:GetChildren() do hide(child) end
+	screenAddedConnection = playerGui.ChildAdded:Connect(function(child)
+		task.defer(hide, child)
+	end)
+end
+
+local function restoreGameplayScreens()
+	if screenAddedConnection then
+		screenAddedConnection:Disconnect()
+		screenAddedConnection = nil
+	end
+	for screen, wasEnabled in hiddenScreens do
+		if screen.Parent then screen.Enabled = wasEnabled end
+	end
+	table.clear(hiddenScreens)
+end
+
 local function hunterHead(): BasePart?
 	for _, candidate in Players:GetPlayers() do
 		if candidate ~= player and candidate:GetAttribute("Role") == "BlindOne" then
@@ -127,12 +225,15 @@ local function runJumpscare()
 	end
 	jumpscaring = true
 	player:SetAttribute("DeathJumpscareFinished", false)
+	hideGameplayScreens()
 	gui.Enabled = true
 	blackout.BackgroundTransparency = 0.42
 	flash.BackgroundTransparency = 0.3
 	deathText.TextTransparency = 0
+	bloodPaint.Visible = true
 	UserInputService.MouseIconEnabled = false
 	pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false) end)
+	pcall(function() StarterGui:SetCore("TopbarEnabled", false) end)
 
 	local target = hunterHead()
 	fallbackFace.Visible = target == nil
@@ -167,6 +268,7 @@ local function runJumpscare()
 	TweenService:Create(blackout, TweenInfo.new(0.16), { BackgroundTransparency = 0 }):Play()
 	flash.BackgroundTransparency = 1
 	deathText.TextTransparency = 1
+	bloodPaint.Visible = false
 	for _, line in glitches do line.BackgroundTransparency = 1 end
 	task.wait(0.65)
 	local camera = workspace.CurrentCamera
@@ -179,6 +281,10 @@ local function runJumpscare()
 	end
 	sting:Stop()
 	impact:Stop()
+	-- Restore the HUD while it is still hidden behind our opaque blackout. The
+	-- casualty terminal immediately takes ownership and hides it again, while a
+	-- later respawn can restore the original enabled states correctly.
+	restoreGameplayScreens()
 	-- The casualty terminal listens for this before taking over the same black
 	-- screen, preventing a one-frame flash of the dead character or normal HUD.
 	player:SetAttribute("DeathJumpscareFinished", true)

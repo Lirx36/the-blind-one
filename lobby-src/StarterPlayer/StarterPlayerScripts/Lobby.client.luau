@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Title screen, physical hub guidance, and queue configuration UI.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,6 +7,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local GuiService = game:GetService("GuiService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TeleportService = game:GetService("TeleportService")
 
@@ -75,7 +77,7 @@ gradient.Parent = menuShade
 local menu = Instance.new("CanvasGroup")
 menu.AnchorPoint = Vector2.new(0, 0.5)
 menu.Position = UDim2.new(0, 70, 0.5, 0)
-menu.Size = UDim2.fromOffset(510, 430)
+menu.Size = UDim2.fromOffset(510, 370)
 menu.BackgroundTransparency = 1
 menu.Parent = menuShade
 local eyebrow = text(menu, "AN ANALOG HORROR EXPERIENCE", 11, Enum.Font.GothamMedium)
@@ -113,6 +115,7 @@ hubHint.BackgroundTransparency = 0.2
 hubHint.BorderSizePixel = 0
 hubHint.Visible = false
 hubHint.Parent = gui
+local hubHintScale = Responsive.Scale(hubHint)
 local hintTitle = text(hubHint, "THE DESCENT LOBBY", 23, Enum.Font.Garamond)
 hintTitle.Size = UDim2.new(1, 0, 0, 38)
 local hintBody = text(hubHint, "Enter a private module with friends, or walk onto PUBLIC DESCENT to match with anyone.", 12, Enum.Font.GothamMedium)
@@ -233,15 +236,12 @@ occupancy.Size = UDim2.fromOffset(148, 18)
 occupancy.TextXAlignment = Enum.TextXAlignment.Right
 occupancy.TextColor3 = Color3.fromRGB(90, 205, 219)
 
-local rosterBox = Instance.new("ScrollingFrame")
+local rosterBox = Instance.new("Frame")
 rosterBox.Position = UDim2.fromOffset(24, 174)
 rosterBox.Size = UDim2.fromOffset(422, 220)
 rosterBox.BackgroundColor3 = Color3.fromRGB(3, 7, 9)
 rosterBox.BackgroundTransparency = 0.2
 rosterBox.BorderSizePixel = 0
-rosterBox.ScrollBarThickness = 3
-rosterBox.ScrollBarImageColor3 = Color3.fromRGB(90, 205, 219)
-rosterBox.CanvasSize = UDim2.fromOffset(0, 400)
 rosterBox.Parent = panel
 local rosterCorner = Instance.new("UICorner")
 rosterCorner.CornerRadius = UDim.new(0, 10)
@@ -435,14 +435,71 @@ elevatorCapacity.Size = UDim2.fromOffset(600, 42)
 elevatorCapacity.TextColor3 = Color3.fromRGB(229, 217, 199)
 elevatorCapacity.TextStrokeTransparency = 0.12
 
-local function resizePanel()
-	local camera = workspace.CurrentCamera
-	if not camera then return end
-	local viewport = camera.ViewportSize
-	panelScale.Scale = math.min(1, math.max(0.68, (viewport.Y - 18) / 640))
+panel.AnchorPoint = Vector2.new(1,0.5)
+panel.Position = UDim2.new(1,-12,0.5,0)
+local queueLayout = {}
+for _, child in panel:GetChildren() do
+	if child:IsA("GuiObject") then queueLayout[child] = {position=child.Position,size=child.Size} end
 end
-resizePanel()
-if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(resizePanel) end
+Responsive.Watch(gui, function(size, touch)
+	local width = math.min(470,size.X-24)
+	local narrow = width < 440
+	local contentHeight = if narrow then 728 else 650
+	panelScale.Scale = math.min(1,(size.X-24)/width,(size.Y-24)/contentHeight)
+	panel.Size = UDim2.fromOffset(width,contentHeight)
+	for child, original in queueLayout do
+		local p,z = original.position,original.size
+		child.Position = UDim2.new(p.X.Scale,p.X.Offset*width/470,p.Y.Scale,p.Y.Offset)
+		child.Size = UDim2.new(z.X.Scale,z.X.Offset*width/470,z.Y.Scale,z.Y.Offset)
+	end
+	panelTitle.TextScaled = true
+	panelStatus.TextWrapped = true
+	panelEyebrow.TextSize = if narrow then 9 else 10
+	for _, row in roster do
+		row.name.Size = UDim2.new(1,if row.badge.Visible then -151 else -57,0,34)
+		row.name.TextTruncate = Enum.TextTruncate.AtEnd
+	end
+	capacityCaption.Size = UDim2.fromOffset(80,14)
+	capacityText.Size = UDim2.fromOffset(80,32)
+	minus.Position = UDim2.new(1,-98,0,7)
+	plus.Position = UDim2.new(1,-48,0,7)
+	minus.Size,plus.Size = UDim2.fromOffset(44,44),UDim2.fromOffset(44,44)
+	if narrow then
+		capacityCard.Position = UDim2.fromOffset(24,434)
+		capacityCard.Size = UDim2.fromOffset(width-48,58)
+		access.Position = UDim2.fromOffset(24,500)
+		access.Size = UDim2.fromOffset(width-48,58)
+		modeTitle.Position = UDim2.fromOffset(24,574)
+		modeHint.Visible = false
+		local buttonWidth = (width-64)/3
+		for index, item in {bot,human,leave} do
+			item.Position = UDim2.fromOffset(24+(index-1)*(buttonWidth+8),598)
+			item.Size = UDim2.fromOffset(buttonWidth,48)
+		end
+		voteRail.Position = UDim2.fromOffset(24,654)
+		start.Position = UDim2.fromOffset(24,670)
+		start.Size = UDim2.fromOffset(width-48,48)
+	else
+		modeHint.Visible = panel.Size.X.Offset >= 440
+		for _, item in {bot,human,leave,start} do item.Size = UDim2.new(item.Size.X.Scale,item.Size.X.Offset,0,44) end
+	end
+	panelShadow.Position = panel.Position
+	panelShadow.Size = UDim2.fromOffset(width*panelScale.Scale,contentHeight*panelScale.Scale)
+	panelShadow.AnchorPoint = panel.AnchorPoint
+	menu.Position = UDim2.new(0, if size.X<800 then 16 else 70, 0.5, 0)
+	Responsive.Scale(menu).Scale = math.min(1,(size.X-32)/510,(size.Y-16)/370)
+	-- The Core UI safe inset is intentionally removed from this centered banner
+	-- on touch screens. It can sit beside the top-left Roblox controls instead of
+	-- consuming a large strip below them. Uniform scaling keeps the title/body
+	-- proportions identical on phones, tablets, and laptops.
+	local topLeftInset = GuiService:GetGuiInset()
+	local hintScale = math.clamp(math.min(size.X / 1280, size.Y / 720), 0.68, 1)
+	hubHint.Size = UDim2.fromOffset(650,76)
+	hubHintScale.Scale = hintScale
+	hubHint.Position = UDim2.new(0.5,0,0,if touch then 6 - topLeftInset.Y else 8)
+	hintBody.TextWrapped = true
+	Responsive.Scale(elevatorOverlay).Scale = math.min(1,(size.X-24)/650)
+end)
 
 local currentState: any = nil
 local currentQueue: any = nil
@@ -498,7 +555,7 @@ end
 local function updateElevatorPortraits(queue: any)
 	portraitGeneration += 1
 	local generation = portraitGeneration
-	elevatorOverlay.Visible = queue ~= nil
+	elevatorOverlay.Visible = queue ~= nil and gui.AbsoluteSize.X >= 1100
 	if not queue then return end
 	descentReadout.Text = if queue.countdown then tostring(queue.countdown)
 		elseif queue.soloForced then "SOLO DESCENT  //  BOT REQUIRED"
@@ -554,7 +611,7 @@ local function updateQueue(queue: any)
 	}
 	activeAccent = accentByQueue[queue.id] or Color3.fromRGB(90, 205, 219)
 	updateElevatorPortraits(queue)
-	elevatorOverlay.Visible = not departureActive
+	elevatorOverlay.Visible = not departureActive and gui.AbsoluteSize.X >= 1100
 	panelEyebrow.Text = if isPrivate then "SECURE MATCH TERMINAL  //  PARTY BALLOT" else "PUBLIC MATCH TERMINAL  //  LIVE BALLOT"
 	panelStroke.Color = activeAccent
 	headerGlow.BackgroundColor3 = activeAccent
@@ -562,7 +619,6 @@ local function updateQueue(queue: any)
 	liveDot.BackgroundColor3 = activeAccent
 	statusDot.BackgroundColor3 = activeAccent
 	occupancy.TextColor3 = activeAccent
-	rosterBox.ScrollBarImageColor3 = activeAccent
 	start.BackgroundColor3 = activeAccent:Lerp(Color3.new(), 0.62)
 	startGradient.Color = ColorSequence.new(activeAccent:Lerp(Color3.new(), 0.72), activeAccent:Lerp(Color3.new(), 0.38))
 	local queueNumber = tostring(queue.id):match("%d+") or ""
@@ -581,7 +637,7 @@ local function updateQueue(queue: any)
 	access.Text = "FRIENDS ONLY  //  " .. (if queue.friendsOnly then "ON" else "OFF")
 	start.Visible = isPrivate and isHost
 	modeTitle.Visible = true
-	modeHint.Visible = true
+	modeHint.Visible = panel.Size.X.Offset >= 440
 	bot.Visible, human.Visible = true, true
 	modeTitle.Text = if isSolo then "THE BLIND ONE  //  SOLO PROTOCOL" else "THE BLIND ONE  //  PARTY VOTE"
 	local botVotes = queue.botVotes or 0
@@ -609,6 +665,14 @@ local function updateQueue(queue: any)
 	for index, row in roster do
 		local member = queue.members[index]
 		row.frame.Visible = index <= queue.capacity
+		-- Two columns keep all ten possible slots on screen without scrolling.
+		local columns = if queue.capacity > 5 then 2 else 1
+		local column = (index-1)%columns
+		local rowIndex = math.floor((index-1)/columns)
+		row.frame.Position = UDim2.new(column/columns,0,0,rowIndex*39)
+		row.frame.Size = UDim2.new(1/columns,-14,0,34)
+		row.badge.Visible = columns == 1
+		row.name.Size = UDim2.new(1,if columns==2 then -57 else -151,0,34)
 		if member then
 			local isOwner = member.userId == queue.ownerUserId
 			row.frame.BackgroundColor3 = if isOwner then activeAccent:Lerp(Color3.new(), 0.78) else Color3.fromRGB(15, 22, 25)

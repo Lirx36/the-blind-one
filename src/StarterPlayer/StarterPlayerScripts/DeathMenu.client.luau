@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Post-jumpscare casualty terminal: three server-authoritative returns, a fixed-
 -- distance third-person spectator camera, and a route back to the lobby.
 local Players = game:GetService("Players")
@@ -318,8 +319,20 @@ local switchQueued = false
 local requestPending = false
 local hiddenScreens: { [ScreenGui]: boolean } = {}
 
+local function setPlayerControlsEnabled(enabled: boolean)
+	local playerScripts = player:FindFirstChild("PlayerScripts")
+	local playerModule = playerScripts and playerScripts:FindFirstChild("PlayerModule")
+	if not playerModule then return end
+	local ok, module = pcall(require, playerModule)
+	if ok and module and module.GetControls then
+		local controls = module:GetControls()
+		if enabled then controls:Enable() else controls:Disable() end
+	end
+end
+
 local function setCoreVisible(visible: boolean)
 	pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, visible) end)
+	pcall(function() StarterGui:SetCore("TopbarEnabled", visible) end)
 	if visible then
 		pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)
 	end
@@ -358,7 +371,8 @@ local function collectTargets(): { SpectateTarget }
 	local collected: { SpectateTarget } = {}
 	local hasHumanBlindOne = false
 	for _, candidate in Players:GetPlayers() do
-		if candidate ~= player and candidate:GetAttribute("InMatch") == true then
+		if candidate ~= player and candidate:GetAttribute("InMatch") == true
+			and candidate:GetAttribute("Escaped") ~= true then
 			local character = candidate.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			if humanoid and humanoid.Health > 0 then
@@ -466,16 +480,24 @@ end
 local function showMenu()
 	if player:GetAttribute("AwaitingDeathChoice") ~= true then return end
 	if spectating then stopSpectating() end
+	local escaped = player:GetAttribute("RecoveryContext") == "Escape"
 	gui.Enabled = true
 	blackout.Visible = true
 	panel.Visible = true
 	spectateOverlay.Visible = false
-	message.Text = "Vital signal lost. Select an available recovery protocol."
+	eyebrow.Text = if escaped then "EXTRACTION TERMINAL  //  OPERATIVE STATUS"
+		else "CASUALTY TERMINAL  //  OPERATIVE STATUS"
+	title.Text = if escaped then "YOU ESCAPED THE HOLLOW" else "YOU WERE HEARD"
+	titleConstraint.MinTextSize = if escaped then 15 else 22
+	message.Text = if escaped then "Extraction confirmed. Select your next protocol."
+		else "Vital signal lost. Select an available recovery protocol."
+	optionsLabel.Text = if escaped then "POST-ESCAPE OPTIONS" else "RECOVERY OPTIONS"
 	message.TextColor3 = Color3.fromRGB(151, 160, 158)
 	requestPending = false
 	updateRespawnButton()
 	hideGameplayScreens()
 	setCoreVisible(false)
+	setPlayerControlsEnabled(false)
 	UserInputService.MouseIconEnabled = true
 	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 	local camera = workspace.CurrentCamera
@@ -506,13 +528,7 @@ local function closeMenuForRespawn(newCharacter: Model?)
 		camera.CameraType = Enum.CameraType.Custom
 		camera.FieldOfView = 70
 	end
-	local playerModule = player:FindFirstChild("PlayerScripts") and player.PlayerScripts:FindFirstChild("PlayerModule")
-	if playerModule then
-		local ok, module = pcall(require, playerModule)
-		if ok and module and module.GetControls then
-			module:GetControls():Enable()
-		end
-	end
+	setPlayerControlsEnabled(true)
 end
 
 respawnButton.MouseButton1Click:Connect(function()
@@ -558,6 +574,12 @@ Remotes.DeathAction.OnClientEvent:Connect(function(action: any, detail: any)
 end)
 
 player:GetAttributeChangedSignal("RespawnsRemaining"):Connect(updateRespawnButton)
+player:GetAttributeChangedSignal("AwaitingDeathChoice"):Connect(function()
+	if player:GetAttribute("AwaitingDeathChoice") == true
+		and player:GetAttribute("RecoveryContext") == "Escape" then
+		task.defer(showMenu)
+	end
+end)
 
 local function watchDeath(character: Model)
 	player:SetAttribute("DeathJumpscareFinished", false)
@@ -579,3 +601,19 @@ player.CharacterAdded:Connect(function(character)
 	watchDeath(character)
 end)
 if player.Character then task.spawn(watchDeath, player.Character) end
+
+panelConstraint:Destroy()
+local terminalScale = Responsive.Scale(panel)
+Responsive.Watch(gui, function(size)
+	-- This ScreenGui owns the full-screen death blackout. Responsive.Watch uses
+	-- CoreUISafeInsets by default for ordinary menus, which leaves the topbar
+	-- strip uncovered; the centered terminal already scales safely on its own.
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	local width = math.min(590, size.X-24)
+	panel.Size = UDim2.fromOffset(width, 570)
+	terminalScale.Scale = math.min(1,(size.X-24)/width,(size.Y-24)/570)
+	navConstraint.MinSize = Vector2.new(0, 56)
+	headerConstraint.MinSize = Vector2.new(0, 60)
+	nav.Position = UDim2.new(0.5, 0, 1, -12)
+	spectateHeader.Position = UDim2.new(0.5, 0, 0, 8)
+end)

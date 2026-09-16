@@ -175,6 +175,7 @@ local function onCharacter(player: Player, character: Model)
 	player:SetAttribute("BallEquipped", false)
 	player:SetAttribute("HasKey", false)
 	player:SetAttribute("Escaped", false)
+	player:SetAttribute("RecoveryContext", "Active")
 	player:SetAttribute("NoiseOverrideUntil", 0)
 	caughtDebounce[player] = nil
 	removeOrphanedCharacters(player, character)
@@ -185,6 +186,7 @@ local function onCharacter(player: Player, character: Model)
 		humanoid.Died:Once(function()
 			clearRepair(player)
 			if player.Parent == Players and player:GetAttribute("Escaped") ~= true then
+				player:SetAttribute("RecoveryContext", "Death")
 				player:SetAttribute("AwaitingDeathChoice", true)
 			end
 		end)
@@ -205,6 +207,7 @@ local function setupPlayer(player: Player)
 	player:SetAttribute("AwaitingDeathChoice", false)
 	player:SetAttribute("HasKey", false)
 	player:SetAttribute("Escaped", false)
+	player:SetAttribute("RecoveryContext", "Active")
 	player.CharacterAdded:Connect(function(character) onCharacter(player, character) end)
 	if player.Character then
 		task.spawn(onCharacter, player, player.Character :: Model)
@@ -464,16 +467,19 @@ for _, station in CollectionService:GetTagged("GateMechanism") do connectMechani
 CollectionService:GetInstanceAddedSignal("GateMechanism"):Connect(connectMechanism)
 
 --------------------------------------------------------------------- final gate
-local function openGate(player: Player, crank: Instance)
+local function openGate(player: Player?, crank: Instance)
 	if gateOpening or generatedMap:GetAttribute("GateOpen") == true then return end
 	local active, total = mechanismProgress()
-	if active < total then
-		setObjective(player, ("The gate is dead. Restore every mechanism (%d/%d)."):format(active, total))
+	local studioPreview = RunService:IsStudio() and Config.StudioAutoOpenGate == true
+	if active < total and not studioPreview then
+		if player then
+			setObjective(player, ("The gate is dead. Restore every mechanism (%d/%d)."):format(active, total))
+		end
 		return
 	end
 	gateOpening = true
 	generatedMap:SetAttribute("GateOpen", true)
-	markPlayerNoise(player, 100, 2.5)
+	if player then markPlayerNoise(player, 100, 2.5) end
 	for _, door in CollectionService:GetTagged("EscapeGateDoor") do
 		if door:IsA("BasePart") then
 			door.CanCollide = false
@@ -530,15 +536,14 @@ local function connectEscapeZone(zone: Instance)
 		local player = character and Players:GetPlayerFromCharacter(character)
 		if not player or player:GetAttribute("Role") == "BlindOne" or player:GetAttribute("Escaped") == true then return end
 		player:SetAttribute("Escaped", true)
+		player:SetAttribute("RecoveryContext", "Escape")
 		setObjective(player, "YOU ESCAPED THE HOLLOW.")
 		broadcastSurvivorObjective()
-		if not RunService:IsStudio() then
-			task.delay(5, function()
-				if player.Parent == Players then
-					pcall(function() TeleportService:TeleportAsync(LOBBY_PLACE_ID, { player }) end)
-				end
-			end)
-		end
+		task.delay(1.6, function()
+			if player.Parent == Players and player:GetAttribute("Escaped") == true then
+				player:SetAttribute("AwaitingDeathChoice", true)
+			end
+		end)
 	end)
 end
 
@@ -548,4 +553,8 @@ CollectionService:GetInstanceAddedSignal("EscapeZone"):Connect(connectEscapeZone
 task.delay(1, function()
 	refreshGatePrompt()
 	broadcastSurvivorObjective()
+	if RunService:IsStudio() and Config.StudioAutoOpenGate == true then
+		local crank = CollectionService:GetTagged("GateCrank")[1]
+		if crank then openGate(nil, crank) end
+	end
 end)

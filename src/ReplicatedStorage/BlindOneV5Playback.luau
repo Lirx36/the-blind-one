@@ -20,8 +20,17 @@ function Playback.Step(visual: Model, root: BasePart, dt: number, forcedSpeed: n
 		for _, item in visual:GetDescendants() do
 			if item:IsA("Bone") and tracks[item.Name] then table.insert(bones,item) end
 		end
-		state = {phase=0,weight=0,bones=bones,position=root.Position}
+		state = {phase=0,weight=0,bones=bones,position=root.Position,rescan=0}
 		states[visual]=state
+	end
+	-- Streaming can deliver bones after the visual Model first becomes visible.
+	state.rescan -= dt
+	if state.rescan <= 0 then
+		state.rescan = 1
+		state.bones = {}
+		for _, item in visual:GetDescendants() do
+			if item:IsA("Bone") and tracks[item.Name] then table.insert(state.bones,item) end
+		end
 	end
 	local delta=root.Position-state.position
 	state.position=root.Position
@@ -36,6 +45,7 @@ function Playback.Step(visual: Model, root: BasePart, dt: number, forcedSpeed: n
 	local nextIndex=index%Motion.Frames+1
 	local scale=visual:GetAttribute("MotionTranslationScale") or 1
 	for _, bone in state.bones do
+		if not bone:IsDescendantOf(visual) then continue end
 		local samples=tracks[bone.Name]
 		local pose=samples[index]:Lerp(samples[nextIndex],position%1)
 		pose=CFrame.new(pose.Position*scale)*pose.Rotation

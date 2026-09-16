@@ -67,6 +67,11 @@ local broadcast = 0
 RunService.Heartbeat:Connect(function(dt)
 	local now = os.clock()
 	for player, st in states do
+		if player:GetAttribute("InMatch") ~= true or player:GetAttribute("Escaped") == true then
+			st.meter, st.move = 0, "idle"
+			player:SetAttribute("Noise", 0)
+			continue
+		end
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -98,7 +103,7 @@ RunService.Heartbeat:Connect(function(dt)
 		local moving = speed > 1.5
 		-- target noise scales with how fast you're actually going, not just the key you hold
 		local speedFactor = math.clamp(speed / Config.WalkSpeed, 0, 1.3)
-		local target = (NOISE_TARGET[st.move] or 0) * (moving and speedFactor or 0)
+		local target = math.clamp((NOISE_TARGET[st.move] or 0) * (moving and speedFactor or 0), 0, 100)
 		-- Objectives such as repairing a relay or cranking the escape gate are
 		-- deliberately loud even when the survivor is standing still. GameService
 		-- supplies a short override so human Blind Ones also see that survivor's

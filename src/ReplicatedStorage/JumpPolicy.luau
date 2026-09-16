@@ -2,14 +2,14 @@
 -- Apply on BOTH server and client: Humanoid state-enable flags don't replicate.
 local JumpPolicy = {}
 
-function JumpPolicy.Apply(humanoid: Humanoid, survivor: boolean)
+function JumpPolicy.Apply(humanoid: Humanoid, disabled: boolean)
 	if humanoid:GetAttribute("OriginalJumpPower") == nil then
 		humanoid:SetAttribute("OriginalJumpPower", humanoid.JumpPower)
 		humanoid:SetAttribute("OriginalJumpHeight", humanoid.JumpHeight)
 		humanoid:SetAttribute("OriginalAutoJump", humanoid.AutoJumpEnabled)
 		humanoid:SetAttribute("OriginalJumpState", humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping))
 	end
-	if survivor then
+	if disabled then
 		humanoid.Jump = false
 		humanoid.JumpPower = 0
 		humanoid.JumpHeight = 0

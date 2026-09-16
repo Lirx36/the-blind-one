@@ -11,7 +11,7 @@ local player = Players.LocalPlayer
 
 local obsoleteGrade = Lighting:FindFirstChild("LanternMonsterDreadGrade")
 if obsoleteGrade then obsoleteGrade:Destroy() end
-for _, oldName in { "LanternView", "LanternGlow", "HeldLanternView", "HeldFlashlightView" } do
+for _, oldName in { "LanternView", "LanternGlow", "HeldLanternView", "HeldFlashlightView", "FlashlightNearEmitter" } do
 	local old = Workspace:FindFirstChild(oldName)
 	if old then old:Destroy() end
 end
@@ -60,6 +60,17 @@ makePart("Switch", Vector3.new(0.2, 0.09, 0.18), Color3.fromRGB(91, 99, 101), En
 -- emitter so both SpotLights always follow the model's true -Z/look direction.
 local beamEmitter = makePart("BeamEmitter", Vector3.new(0.03, 0.03, 0.03), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, CFrame.new(0, 0, -1.41), nil, 1)
 
+-- Close geometry can sit between the camera and the hand-mounted lens. Keep a
+-- second invisible emitter just in front of the camera so nearby surfaces can
+-- never end up behind the light source.
+local nearEmitter = Instance.new("Part")
+nearEmitter.Name = "FlashlightNearEmitter"
+nearEmitter.Size = Vector3.new(0.03, 0.03, 0.03)
+nearEmitter.Transparency = 1
+nearEmitter.Anchored = true
+nearEmitter.CanCollide, nearEmitter.CanTouch, nearEmitter.CanQuery, nearEmitter.CastShadow = false, false, false, false
+nearEmitter.Parent = nil
+
 for index = 1, 6 do
 	makePart("GripRib", Vector3.new(0.045, 0.38, 0.38), edgeMetal, Enum.Material.Metal, CFrame.new(0, 0, 0.42 - index * 0.13) * axisForward, Enum.PartType.Cylinder)
 end
@@ -84,13 +95,24 @@ spill.Angle = 54
 spill.Shadows = false
 spill.Parent = beamEmitter
 
+-- This short, wide cone originates at the camera rather than the lowered hand.
+local nearBeam = Instance.new("SpotLight")
+nearBeam.Name = "NearBeam"
+nearBeam.Face = Enum.NormalId.Front
+nearBeam.Color = Color3.fromRGB(202, 214, 216)
+nearBeam.Brightness = 2.2
+nearBeam.Range = 14
+nearBeam.Angle = 110
+nearBeam.Shadows = false
+nearBeam.Parent = nearEmitter
+
 local nearFill = Instance.new("PointLight")
 nearFill.Name = "NearFill"
 nearFill.Color = Color3.fromRGB(184, 197, 200)
-nearFill.Brightness = 0.04
-nearFill.Range = 3.5
+nearFill.Brightness = 0.75
+nearFill.Range = 7
 nearFill.Shadows = false
-nearFill.Parent = beamEmitter
+nearFill.Parent = nearEmitter
 
 local rightHand: BasePart? = nil
 local lightEnabled = true
@@ -113,7 +135,8 @@ player.CharacterAdded:Connect(function(character)
 end)
 
 local function applyLightState()
-	hotspot.Enabled, spill.Enabled, nearFill.Enabled = lightEnabled, lightEnabled, lightEnabled
+	hotspot.Enabled, spill.Enabled = lightEnabled, lightEnabled
+	nearBeam.Enabled, nearFill.Enabled = lightEnabled, lightEnabled
 	lens.Material = Enum.Material.Glass
 	lens.Transparency = if lightEnabled then 0.18 else 0.46
 	lens.Color = if lightEnabled then Color3.fromRGB(185, 201, 204) else Color3.fromRGB(45, 53, 55)
@@ -126,6 +149,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 applyLightState()
+player:GetAttributeChangedSignal("TouchLightToggle"):Connect(function()
+	if player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "Survivor" then
+		lightEnabled = not lightEnabled
+		applyLightState()
+	end
+end)
 
 RunService:BindToRenderStep("HeldFlashlightView", Enum.RenderPriority.Camera.Value + 2, function()
 	if player:GetAttribute("InMatch") ~= true
@@ -133,14 +162,18 @@ RunService:BindToRenderStep("HeldFlashlightView", Enum.RenderPriority.Camera.Val
 		or player:GetAttribute("PhotoModeActive") == true
 		or player:GetAttribute("Spectating") == true then
 		if flashlight.Parent then flashlight.Parent = nil end
+		if nearEmitter.Parent then nearEmitter.Parent = nil end
 		return
-	elseif not flashlight.Parent then
-		flashlight.Parent = Workspace
+	else
+		if not flashlight.Parent then flashlight.Parent = Workspace end
+		if not nearEmitter.Parent then nearEmitter.Parent = Workspace end
 	end
 
 	local camera = Workspace.CurrentCamera
+	if not camera then return end
+	nearEmitter.CFrame = camera.CFrame * CFrame.new(0, -0.08, -0.18)
 	local hand = rightHand
-	if not camera or not hand or not hand.Parent then return end
+	if not hand or not hand.Parent then return end
 
 	local lookDown = math.clamp(-camera.CFrame.LookVector.Y, 0, 1)
 	local handDepth = (hand.Position - camera.CFrame.Position):Dot(camera.CFrame.LookVector)

@@ -11,7 +11,7 @@ local function refresh()
 	-- The server snapshots the original values before locking jumping. Wait for
 	-- that snapshot instead of accidentally remembering its replicated zeroes.
 	if humanoid and humanoid:GetAttribute("OriginalJumpPower") ~= nil then
-		JumpPolicy.Apply(humanoid, player:GetAttribute("Role") ~= "BlindOne")
+		JumpPolicy.Apply(humanoid, true)
 	end
 end
 
@@ -26,7 +26,6 @@ player.CharacterAdded:Connect(characterAdded)
 player:GetAttributeChangedSignal("Role"):Connect(refresh)
 if player.Character then task.spawn(characterAdded, player.Character) end
 
-ContextActionService:BindActionAtPriority("NoSurvivorJump", function()
-	return if player:GetAttribute("Role") ~= "BlindOne"
-		then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
+ContextActionService:BindActionAtPriority("NoMatchJump", function()
+	return Enum.ContextActionResult.Sink
 end, false, Enum.ContextActionPriority.High.Value + 10, Enum.PlayerActions.CharacterJump)

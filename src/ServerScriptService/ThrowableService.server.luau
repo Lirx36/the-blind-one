@@ -14,6 +14,17 @@ local noiseBindable = ServerStorage:WaitForChild("Noise") :: BindableEvent
 
 local held: { [Player]: number } = {}
 
+local function finiteVector(value: any): boolean
+	return typeof(value) == "Vector3" and value.X == value.X and value.Y == value.Y
+		and value.Z == value.Z and value.Magnitude < math.huge
+end
+
+local function canUseRocks(player: Player): boolean
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne"
+		and player:GetAttribute("Escaped") ~= true and hum ~= nil and hum.Health > 0
+end
+
 local function setHeld(player: Player, n: number)
 	held[player] = math.clamp(n, 0, Config.MaxThrowables)
 	player:SetAttribute("HeldBalls", held[player])
@@ -62,10 +73,11 @@ for _, oldRock in CollectionService:GetTagged("Throwable") do
 end
 
 Remotes.Pickup.OnServerEvent:Connect(function(player, rock, cameraOrigin, cameraLook)
-	if player:GetAttribute("Role") == "BlindOne" then
+	if not canUseRocks(player) then
 		return
 	end
-	if typeof(rock) ~= "Instance" or not rock:IsA("BasePart") or not rock:HasTag("Throwable") then
+	if typeof(rock) ~= "Instance" or not rock:IsA("BasePart") or not rock:HasTag("Throwable")
+		or not rock:IsDescendantOf(workspace) then
 		return
 	end
 	if (held[player] or 0) >= Config.MaxThrowables then
@@ -74,7 +86,7 @@ Remotes.Pickup.OnServerEvent:Connect(function(player, rock, cameraOrigin, camera
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local head = char and char:FindFirstChild("Head") :: BasePart?
-	if not hrp or not head or typeof(cameraOrigin) ~= "Vector3" or typeof(cameraLook) ~= "Vector3" then
+	if not hrp or not head or not finiteVector(cameraOrigin) or not finiteVector(cameraLook) then
 		return
 	end
 	local toRock = rock.Position - cameraOrigin
@@ -97,10 +109,10 @@ Remotes.Pickup.OnServerEvent:Connect(function(player, rock, cameraOrigin, camera
 end)
 
 Remotes.Throw.OnServerEvent:Connect(function(player, direction)
-	if player:GetAttribute("Role") == "BlindOne" then
+	if not canUseRocks(player) then
 		return
 	end
-	if typeof(direction) ~= "Vector3" or (held[player] or 0) <= 0 then
+	if not finiteVector(direction) or direction.Magnitude < 0.001 or (held[player] or 0) <= 0 then
 		return
 	end
 	local char = player.Character
@@ -122,10 +134,10 @@ Remotes.Throw.OnServerEvent:Connect(function(player, direction)
 
 	local landed = false
 	local function onHit(other: BasePart)
-		if landed then
+		if landed or not rock:IsDescendantOf(workspace) then
 			return
 		end
-		if other:IsDescendantOf(char) then
+		if other:IsDescendantOf(char) or not other.CanCollide then
 			return
 		end
 		landed = true
@@ -134,7 +146,7 @@ Remotes.Throw.OnServerEvent:Connect(function(player, direction)
 	end
 	rock.Touched:Connect(onHit)
 	task.delay(4, function()
-		if not landed then
+		if not landed and rock:IsDescendantOf(workspace) then
 			landed = true
 			rock:SetAttribute("BlindOneDecoyUntil", workspace:GetServerTimeNow() + 3.2)
 			noiseBindable:Fire(rock.Position, Config.ThrowImpactNoise * 0.6)

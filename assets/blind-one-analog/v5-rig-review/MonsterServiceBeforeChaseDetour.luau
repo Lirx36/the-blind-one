@@ -19,7 +19,7 @@ local photoFrozen = false
 
 local function humanBlindOne(): Player?
 	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("InMatch") == true and player:GetAttribute("Role") == "BlindOne" then
+		if player:GetAttribute("InMatch") ~= true or player:GetAttribute("Role") == "BlindOne" then
 			return player
 		end
 	end
@@ -297,8 +297,7 @@ end
 local function eligible(player: Player): boolean
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	return player.Parent == Players and player:GetAttribute("InMatch") == true
-		and player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("Escaped") ~= true
-		and hum ~= nil and hum.Health > 0
+		and player:GetAttribute("Role") ~= "BlindOne" and hum ~= nil and hum.Health > 0
 end
 
 local function pollPlayers()
@@ -341,7 +340,7 @@ local function decide()
 		if escalate then
 			state = "hunt"
 			lastHuntHeard = now
-		elseif heard.player == nil or (state == "hunt" and now - lastHuntHeard > Config.MonsterHuntGrace) then
+		elseif state == "hunt" and now - lastHuntHeard > Config.MonsterHuntGrace then
 			state = "investigate"
 		elseif state ~= "hunt" then
 			state = "investigate"
@@ -396,9 +395,6 @@ local pathObj = PathfindingService:CreatePath(AGENT)
 local directFallbackGoal: Vector3? = nil
 local routeDirty = false
 local computing = false
-local Detour = require(ReplicatedStorage:WaitForChild("MonsterDetour"))
-local blockedTargets: {Vector3}? = nil
-local followingDetour = false
 local navigationParams = RaycastParams.new()
 navigationParams.FilterType = Enum.RaycastFilterType.Include
 navigationParams.RespectCanCollide = true
@@ -434,9 +430,17 @@ local function fallbackRoute(goal: Vector3)
 		if #fallback >= 2 and passageClear(root.Position, fallback[2].Position) then
 			wpIndex = 2
 		end
-		-- Keep the clear prefix. A prop many rooms ahead must not prevent us
-		-- from starting this route; the mover checks every step and requests a
-		-- local detour once the obstruction is actually within reach.
+		-- A cell route knows passages, not the furniture inside them. Use it
+		-- only if every segment is actually open; never walk into a locker.
+		local previous = root.Position
+		for index = wpIndex, #fallback do
+			if not passageClear(previous, fallback[index].Position) then
+				waypoints = {}
+				routeDirty = true
+				return
+			end
+			previous = fallback[index].Position
+		end
 	else
 		if passageClear(root.Position, goal) then directFallbackGoal = goal end
 	end
@@ -444,25 +448,9 @@ end
 
 local function recompute(goal: Vector3)
 	lastCompute = os.clock()
-	if (goal-currentGoal).Magnitude>6 then blockedTargets=nil end
 	currentGoal = goal
 	directFallbackGoal = nil
 	routeDirty = false
-	followingDetour = false
-	if blockedTargets then
-		local targets=blockedTargets
-		blockedTargets=nil
-		local route=Detour.Find(root.Position,targets,passageClear)
-		if route then
-			waypoints={}
-			for _, p in route do table.insert(waypoints,PathWaypoint.new(p,Enum.PathWaypointAction.Walk)) end
-			wpIndex=1
-			followingDetour=true
-			monster:SetAttribute("NavigationRecovery","LocalDetour")
-			return
-		end
-		monster:SetAttribute("NavigationRecovery","Repath")
-	end
 	-- Roblox navigation includes the actual prop colliders. The maze graph
 	-- is a checked fallback only, not the primary route through furnished rooms.
 	local ok = pcall(function()
@@ -482,8 +470,8 @@ local function recompute(goal: Vector3)
 	else
 		waypoints = {}
 		wpIndex = 1
-		-- While navigation is unavailable, follow the maze passage graph.
-		-- Every movement step still goes through the collision sweep.
+		-- While navigation is unavailable, accept only a fully clear fallback.
+		-- An obstructed fallback stays stopped until the throttled retry.
 		fallbackRoute(goal)
 	end
 end
@@ -562,9 +550,6 @@ RunService.Heartbeat:Connect(function(dt)
 			monster.Parent = workspace
 			waypoints = {}
 			wpIndex = 1
-			directFallbackGoal, blockedTargets, heard, wanderGoal = nil, nil, nil, nil
-			followingDetour, routeDirty = false, true
-			state = "wander"
 		end
 	end
 	if humanMonster then
@@ -591,17 +576,10 @@ RunService.Heartbeat:Connect(function(dt)
 	local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
 
 	if flat.Magnitude < 0.4 then
-		monster:SetAttribute("VisualMoveSpeed", 0)
 		if wp then
 			wpIndex += 1
 			if wpIndex > #waypoints then
-				if followingDetour then
-					waypoints = {}
-					routeDirty = true
-					followingDetour = false
-				else
-					directFallbackGoal = currentGoal
-				end
+				directFallbackGoal = currentGoal
 			end
 		else
 			directFallbackGoal = nil
@@ -619,13 +597,6 @@ RunService.Heartbeat:Connect(function(dt)
 		monster:SetAttribute("VisualMoveSpeed", 0)
 		-- Stop and plan a real detour. Blind sideways steps can oscillate or
 		-- trap the monster against the same obstacle.
-		blockedTargets = {}
-		for index=wpIndex,math.min(#waypoints,wpIndex+4) do
-			table.insert(blockedTargets,waypoints[index].Position)
-		end
-		if #blockedTargets==0 then table.insert(blockedTargets,currentGoal) end
-		monster:SetAttribute("NavigationRecovery","Blocked")
-		monster:SetAttribute("NavigationBlockedAt",root.Position)
 		waypoints = {}
 		wpIndex = 1
 		directFallbackGoal = nil
@@ -684,7 +655,7 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 	for _, player in Players:GetPlayers() do
-		if player == humanMonster or not eligible(player) then
+		if player:GetAttribute("InMatch") ~= true or player == humanMonster or player:GetAttribute("Role") == "BlindOne" then
 			continue
 		end
 		local char = player.Character

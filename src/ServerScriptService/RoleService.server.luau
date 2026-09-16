@@ -57,7 +57,7 @@ local function styleCharacter(player: Player, character: Model, moveToMonsterSpa
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local animate = character:FindFirstChild("Animate")
 	if humanoid then
-		JumpPolicy.Apply(humanoid, player:GetAttribute("Role") ~= "BlindOne")
+		JumpPolicy.Apply(humanoid, true)
 	end
 	if player:GetAttribute("Role") == "BlindOne" then
 		if animate and animate:IsA("LocalScript") then

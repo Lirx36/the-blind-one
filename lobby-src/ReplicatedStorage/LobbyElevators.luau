@@ -4,6 +4,7 @@
 local TweenService = game:GetService("TweenService")
 local ServerStorage = game:GetService("ServerStorage")
 
+local Chime = require(game:GetService("ReplicatedStorage"):WaitForChild("ElevatorChime"))
 local LobbyElevators = {}
 
 LobbyElevators.DOOR_TIME = 0.8
@@ -623,7 +624,12 @@ end
 function LobbyElevators.SetOpen(queueId: string, shouldOpen: boolean, instant: boolean?): number
 	local rig = rigFor(queueId)
 	if not rig then return 0 end
+	local wasOpen = rig:GetAttribute("Open") == true
 	rig:SetAttribute("Open", shouldOpen)
+	if shouldOpen and not wasOpen and not instant then
+		local emitter = rig:FindFirstChild("EntryPoint")
+		if emitter and emitter:IsA("BasePart") then Chime.Play(emitter, true) end
+	end
 	local refs = rig:FindFirstChild("DoorRefs")
 	if refs then
 		for _, reference in ipairs(refs:GetChildren()) do
@@ -717,6 +723,9 @@ function LobbyElevators.BeginDeparture(queueId: string): number
 	local rig = rigFor(queueId)
 	if not rig or rig:GetAttribute("Departing") == true then return 0 end
 	rig:SetAttribute("Departing", true)
+	-- BeginDeparture runs after the close tween completes, once per launch.
+	local emitter = rig:FindFirstChild("EntryPoint")
+	if emitter and emitter:IsA("BasePart") then Chime.Play(emitter, false) end
 	for _, item in ipairs(rig:GetDescendants()) do
 		if not item:IsA("BasePart") or STATIC_DEPARTURE_PARTS[item.Name] then continue end
 		if item:GetAttribute("DepartureRestCFrame") == nil then item:SetAttribute("DepartureRestCFrame", item.CFrame) end

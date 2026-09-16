@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Cross-place destination sequence: wait for the complete party, watch their
 -- elevator reach the labyrinth floor, reveal the real avatars, then fade in.
 local Players = game:GetService("Players")
@@ -10,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 
+local Chime = require(ReplicatedStorage:WaitForChild("ElevatorChime"))
 local player = Players.LocalPlayer
 local teleportData = TeleportService:GetLocalPlayerTeleportData()
 local isArrival = (typeof(teleportData) == "table" and teleportData.DirectMatch == true)
@@ -429,6 +431,7 @@ end
 local function revealParty()
 	if revealHandled then return end
 	revealHandled = true
+	Chime.Play(game:GetService("SoundService"), true)
 	buildPartyAvatars()
 	for _, item in ipairs(cabin:GetDescendants()) do
 		if item:IsA("BasePart") then
@@ -505,3 +508,7 @@ handlePhase()
 
 local readyRemote = ReplicatedStorage:WaitForChild("ArrivalReady", 20)
 if readyRemote and readyRemote:IsA("RemoteEvent") then readyRemote:FireServer() end
+
+Responsive.Watch(gui, function(size)
+ Responsive.Scale(waiting).Scale = math.min(1, (size.X-24)/620, (size.Y-24)/210)
+end)

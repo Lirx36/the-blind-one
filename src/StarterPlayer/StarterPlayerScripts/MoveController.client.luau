@@ -27,6 +27,7 @@ end
 -- Poll held input instead of relying on one-time input callbacks. This cannot get
 -- stuck if focus changes while Shift is held.
 local function wantsToSprint(): boolean
+	if player:GetAttribute("TouchSprint") == true then return true end
 	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
 		return true
@@ -38,6 +39,7 @@ end
 -- Poll crouch just like sprint so releasing Ctrl always stands the player up,
 -- even if Studio or the camera consumed one of the input events.
 local function wantsToCrouch(): boolean
+	if player:GetAttribute("TouchCrouch") == true then return true end
 	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
 		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
 		return true

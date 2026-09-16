@@ -631,3 +631,65 @@ User confirmed the repaired V5 limp and limb movement work naturally. Restored 2
   vertical dividers were replaced with horizontal bunker braces so the far end
   cannot be mistaken for a second elevator-door set.
 
+
+## 2026-09-15 — Bot/rock audit and hunt tuning
+
+- Bot hunt speed is now 17.5 studs/s; investigate remains 14 and wander 9. Player-controlled Blind One remains 19.
+- Fixed `humanBlindOne()` treating any loading/non-match survivor as the human monster. Only an active player with Role=BlindOne now replaces the bot. Returning from human mode clears old AI targets/routes.
+- Escaped survivors are excluded from hearing targets and catch/dread processing. Loading/escaped players no longer generate movement noise or receive movement speed changes from NoiseService. Movement noise target is capped at the advertised 100.
+- Maze fallback no longer rejects its entire route because of furniture in a distant room. It keeps the route; every actual move is still collision-swept, with the existing MonsterDetour local recovery on obstruction.
+- Anonymous noise (including rocks) selects investigate rather than inheriting hunt grace from a previous survivor. Reaching a waypoint now clears VisualMoveSpeed for that stopped frame.
+- V5 playback rescans bones once per second to handle streamed/late descendants and ignores removed bones. No bind poses, meshes, or animation tracks changed.
+- Rocks reject invalid/zero/non-finite directions before consuming inventory. Pickup/throw require a living active survivor; pickup requires a rock still in Workspace. Noncolliding triggers no longer count as impacts. Removed/picked-up rocks cannot produce the delayed fallback sound.
+- Rock behavior: first solid impact emits loudness 95 at its location, audible to the bot within the 300-stud cap. It must beat the current target's distance-adjusted score and commitment margin. Continued survivor noise can reclaim attention. Investigate speed 14; six seconds at the heard spot, then patrol if no stronger sound takes over. Missed collision callback has a 4-second, loudness-57 fallback. Human monster receives an anonymous silhouette while the decoy is active, ending 3.2 seconds after impact; human movement is never forced.
+- Validation: all 41 main/lobby Luau sources compiled with official Luau CLI; 34 isolated assertions passed using actual extracted AI functions/modules and engine doubles (`tests/run_ai_audit.py`). Main and lobby Rojo builds and `git diff --check` passed. All five edited Studio scripts read back equal to local source; only one active MonsterService exists.
+- Applied only to the existing MAIN Studio Edit datamodel. No Play session started, no Roblox publish, no Git push. User performs gameplay tests. Engine doubles do not validate Roblox navmesh/collider geometry, replication, or visual quality; these remain user test items.
+- Preserved the other model's existing DeathJumpscare, DeathMenu, LabyrinthAmbience and SilentMovement changes.
+
+## 2026-09-15 — Responsive UI and touch controls
+
+- Added shared `ResponsiveUI` safe-area/resize helpers to both main and lobby projects. UI follows usable ScreenGui bounds and PreferredInput, including window resizing and rotation. Fullscreen effects retain their own coverage.
+- HUD reflows the objective, generator progress, noise/stamina and inventory for compact screens. Short landscape hides the decorative heading; keyboard controls panel is hidden on touch/small windows. Photo-mode helper stays Studio/keyboard-only.
+- Added touch RUN/CROUCH toggles and LIGHT toggle, plus explicit THROW and PICK UP buttons. Roblox's built-in movement joystick/camera remain in use. Movement uses the same stamina/noise rules as keyboard controls; focus loss, death and blocking menus clear toggles.
+- Generator calibration has a compact layout with separated progress, track and action button. Death terminal and elevator queue use bounded scrolling viewports rather than shrinking controls by screen height. Narrow elevator menus reflow capacity/access/voting and use 44+ pixel controls. Lobby title/loading/role banners also fit smaller screens.
+- Validation: 43 Luau files compiled; main and lobby Rojo builds passed; 60 isolated resize-callback scenarios passed (`tests/run_ui_layout_checks.py`). This checks layout math with GUI doubles, not actual rendered text/Roblox touch interactions. All 14 deployed script/module copies were read back against local fingerprints.
+- Applied to BOTH existing Studio Edit places. No Play session started and no Roblox publish or Git push. User should test phone portrait/landscape, tablet and laptop layouts, touch movement/stamina, light, equip/throw/pickup, calibration, death recovery, and elevator menu scrolling. Real phone testing needs both edited places published first.
+- Pre-edit local script copies are under `.tools/responsive-before` (ignored). Existing AI and other model changes preserved.
+
+## 2026-09-15 — User correction: scale menus, no scrolling
+
+- Supersedes the scrolling approach above: user explicitly wants device-sized menus without scrolling. Death terminal and elevator panel now scale uniformly to fit both available width and height. Removed the ScrollPanel helper and all lobby roster scrolling; larger parties use two roster columns so all ten slots fit.
+- Restored OBJECTIVE heading and decorative rule on short phone screens. The short banner uses a smaller 19px heading above the mission text; it is no longer hidden by the landscape breakpoint.
+- 60 layout scenarios passed with assertions for visible heading, text separation and scaled menu bounds. Changed scripts compile; main/lobby builds pass. Five Studio source copies read back identical to local edits. No Play, publishing or Git push performed. User tests the visual size and readability.
+
+## 2026-09-15 — Raised phone objective and elevator dings
+
+- Phone HUD uses DeviceSafeInsets and places its objective banner 2px below that safe top edge, instead of the extra core-topbar inset plus 16px. Generator progress follows the banner upward. Desktop retains its previous top spacing; heading remains visible. Reveal tween completion reapplies the latest responsive position after rotation.
+- Added shared ElevatorChime to both projects using Roblox-owned electronicpingshort audio asset 12221990 (Creator Store: https://create.roblox.com/store/asset/12221990). Moderate volume 0.55; departure pitch 0.85, arrival 1.05; sounds are cleaned up after six seconds.
+- Lobby BeginDeparture emits one positional ding after the door-close tween. Actual non-instant closed-to-open transitions also ding, without duplicates from repeated SetOpen calls. Destination ArrivalCinematic emits its arrival ding when Reveal starts opening the doors; existing reveal guard prevents repeats.
+- 60 UI layout cases and isolated ding transition/duplicate checks pass; changed scripts compile and both Rojo builds pass. All updated Studio sources read back correctly. No Play started, no audio audition performed, no Roblox publishing or Git push. User tests phone position and sound volume/loading/timing; both places need publishing for live teleport testing.
+
+## 2026-09-15 — Phone lobby banner and near-field flashlight
+
+- The hub-only `THE DESCENT LOBBY` banner now scales uniformly from its 650x76 desktop proportions, with a 0.68 floor for readability. Touch layouts move it into the unused top-center device area instead of leaving it below the tall Core UI inset; tablet and laptop sizes interpolate back to the original dimensions.
+- After the first hand-mounted near-light attempt still missed close geometry on PC, the near emitter was separated from the held model and placed 0.18 studs ahead of the camera every frame. It uses a 14-stud, 110-degree near cone plus a restrained 7-stud fill; the original long hotspot/spill remains hand-mounted.
+- Desktop HUD now uses no Core UI inset and an 8px top offset, returning the centered objective to the top of the screen. Touch HUD still uses DeviceSafeInsets and its existing 2px safe-top offset.
+- The changed Luau files compile and `git diff --check` passes. No Play session, publish, Git commit, or push was performed; user performs visual testing.
+
+## 2026-09-15 — Full-screen casualty blackout
+
+- Fixed the death terminal leaving the Core UI top strip uncovered. `DeathMenu` now restores `ScreenInsets.None` after the responsive helper attaches, so its black backdrop covers the complete viewport while the centered terminal retains responsive scaling.
+- The updated source compiles, passes `git diff --check`, and was copied exactly into the existing MAIN Studio Edit place. No Play session, publish, Git commit, or push was performed.
+
+## 2026-09-15 - Player Blind One nearby navigation vision
+- Replaced hidden-map / 35 cyan SurfaceEcho dots with visible real geometry. Client black fog begins at 20 studs and ends at 35; local ambient and 35-stud fill light make nearby paths readable. Removed per-frame surface raycast pool.
+- Actual survivor bodies remain hidden to the player monster; existing noise-driven sound silhouettes remain. Bot AI and survivor lighting unchanged.
+- Role exit restores original fog, ambient, exposure, post-effect enabled states and any temporarily detached Atmosphere. Repeated-frame and repeated-round fixture passed; Luau compile and main Rojo build passed.
+- Main Studio BlindOneController synced and source readback verified. No Play test or publishing performed. User should publish main place and test player monster on alt account; visual brightness/range still needs user's device check.
+
+## 2026-09-16 - Player monster jump lock and hunter HUD
+- Disabled Blind One jumping through existing shared JumpPolicy on server and client, including automatic mobile jump; survivor restriction retained.
+- Reduced player monster vision to 30 studs, black fade starts at 17; fill-light range matches.
+- Reused survivor objective banner for persistent red "You are the blind one" title, hunter directive, and sound/catch tip. Same Garamond font, reveal animation, divider, and responsive layout. Survivor progress/inventory remain role-specific.
+- All source Luau compilation, both Rojo builds, 60 layout cases, 34 AI checks and isolated jump-policy checks passed. Updated layout test mock for existing lobby GuiService inset usage.
+- Five changed scripts synced to main Studio and readback verified. User handles Play and publishing.

@@ -471,26 +471,30 @@ spawnPad.Anchored,spawnPad.Transparency,spawnPad.CanCollide,spawnPad.Duration=tr
 spawnPad.Parent=map
 roomSign(Layout.Position(10,19)+Vector3.new(0,0,5),"THE HOLLOW / KEEP QUIET",Color3.fromRGB(185,188,165))
 
--- Only the locked northern opening leads outside. The gate leaves carry all
--- detail with them; no stationary bars remain across the exit after opening.
+-- Only the locked northern opening leads outside. The gate opens into a sealed
+-- extraction vestibule so players never see beyond the generated world.
 local gateCenter=Vector3.new(0,0,-HALF)
-part("ExitCanopy",Vector3.new(24,2,30),gateCenter+Vector3.new(0,21,-13),Color3.fromRGB(48,51,48),Enum.Material.Concrete,roof)
-part("ExitApron",Vector3.new(28,1,30),gateCenter+Vector3.new(0,-0.5,-10),Color3.fromRGB(50,57,51),Enum.Material.Slate)
+part("ExitCanopy",Vector3.new(24,2,30),gateCenter+Vector3.new(0,21,-13),Color3.fromRGB(16,19,20),Enum.Material.Metal,roof)
+part("ExitApron",Vector3.new(28,1,34),gateCenter+Vector3.new(0,-0.5,-12),Color3.fromRGB(50,57,51),Enum.Material.Slate)
 for _, x in {-1,1} do
-	local door=part("EscapeGateLeaf",Vector3.new(9,18,1.5),gateCenter+Vector3.new(x*4.5,9,0),Color3.fromRGB(56,64,59),Enum.Material.CorrodedMetal)
+	local door=part("EscapeGateLeaf",Vector3.new(9,18,1.5),gateCenter+Vector3.new(x*4.5,9,0),Color3.fromRGB(22,29,30),Enum.Material.Metal)
 	CollectionService:AddTag(door,"EscapeGateDoor")
-	part("ExitSidewall",Vector3.new(2.8,20,29),gateCenter+Vector3.new(x*10.4,10,-13),Color3.fromRGB(68,73,66),Enum.Material.Brick,walls)
+	part("ExitSidewall",Vector3.new(2.8,20,29),gateCenter+Vector3.new(x*10.4,10,-13),Color3.fromRGB(28,32,31),Enum.Material.Brick,walls)
 end
-local header=part("ExitHeader",Vector3.new(22,3,3),gateCenter+Vector3.new(0,19,0),Color3.fromRGB(73,79,69),Enum.Material.Concrete)
-label(header,"PERIMETER / EXIT",Color3.fromRGB(179,189,162),Enum.NormalId.Back)
-local crank=part("GateCrank",Vector3.new(2,3.5,2),gateCenter+Vector3.new(6,1.75,7),Color3.fromRGB(74,78,63),Enum.Material.CorrodedMetal)
+part("ExitEndWall",Vector3.new(24,22,2),gateCenter+Vector3.new(0,10,-28),Color3.fromRGB(2,3,4),Enum.Material.SmoothPlastic,walls)
+local header=part("ExitHeader",Vector3.new(22,2,2.4),gateCenter+Vector3.new(0,19,0),Color3.fromRGB(12,16,17),Enum.Material.Metal)
+local sign=part("ExitSign",Vector3.new(18,1.45,0.18),gateCenter+Vector3.new(0,17,1.3),Color3.fromRGB(3,7,8),Enum.Material.SmoothPlastic,decor,true)
+label(sign,"PERIMETER EXIT  //  SURFACE ACCESS",Color3.fromRGB(190,214,207),Enum.NormalId.Back)
+local signRail=part("ExitSignRail",Vector3.new(18,0.12,0.12),gateCenter+Vector3.new(0,16.18,1.42),Color3.fromRGB(75,177,145),Enum.Material.Neon,decor,true)
+lamp(signRail,Color3.fromRGB(75,177,145),0.35,8)
+local crank=part("GateCrank",Vector3.new(2,3.5,2),gateCenter+Vector3.new(6,1.75,7),Color3.fromRGB(31,42,42),Enum.Material.Metal)
 local prompt=Instance.new("ProximityPrompt")
 prompt.Name,prompt.ActionText,prompt.ObjectText="GatePrompt","Gate locked (0/5)","Labyrinth perimeter"
 prompt.KeyboardKeyCode,prompt.GamepadKeyCode=Enum.KeyCode.E,Enum.KeyCode.ButtonX
 prompt.HoldDuration,prompt.MaxActivationDistance,prompt.RequiresLineOfSight=0.35,9,true
 prompt.Parent=crank
 CollectionService:AddTag(crank,"GateCrank")
-local escape=part("EscapeZone",Vector3.new(17,10,5),gateCenter+Vector3.new(0,5,-14),Color3.new(),Enum.Material.SmoothPlastic,map,true)
+local escape=part("EscapeZone",Vector3.new(17,10,4),gateCenter+Vector3.new(0,5,-24.5),Color3.new(),Enum.Material.SmoothPlastic,map,true)
 escape.Transparency,escape.CanTouch=1,true
 CollectionService:AddTag(escape,"EscapeZone")
 map:SetAttribute("Ready",true)

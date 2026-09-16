@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Studio-only convenience for photographing the solo AI monster.
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -264,7 +265,7 @@ label.Text = "Press P for Photo Mode / free flight"
 label.Parent = gui
 
 local function refreshAvailability()
-	local available = player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne"
+	local available = RunService:IsStudio() and not Responsive.IsTouch() and player:GetAttribute("InMatch") == true and player:GetAttribute("Role") ~= "BlindOne"
 	gui.Enabled = available
 	if not available and savedLighting then
 		player:SetAttribute("PhotoModeActive", false)
@@ -275,6 +276,7 @@ local function refreshAvailability()
 end
 player:GetAttributeChangedSignal("Role"):Connect(refreshAvailability)
 player:GetAttributeChangedSignal("InMatch"):Connect(refreshAvailability)
+Responsive.Watch(gui, refreshAvailability)
 refreshAvailability()
 
 UserInputService.InputBegan:Connect(function(input)

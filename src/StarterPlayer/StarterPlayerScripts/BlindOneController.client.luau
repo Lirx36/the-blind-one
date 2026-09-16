@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Client presentation for a player-controlled Blind One. The world is heavily
 -- desaturated and noisy survivors appear as short-lived sound silhouettes.
 local Players = game:GetService("Players")
@@ -18,11 +19,10 @@ if oldVision then
 end
 local vision = Instance.new("ColorCorrectionEffect")
 vision.Name = "LocalBlindOneVision"
--- Map hiding supplies blindness. Crushing all scene colors also crushed the
--- cyan surface echoes into dark reddish pixels.
+-- Nearby geometry stays readable; black distance fog limits navigation sight.
 vision.Brightness = 0
 vision.Contrast = 0
-vision.Saturation = 0
+vision.Saturation = -0.7
 vision.TintColor = Color3.new(1, 1, 1)
 vision.Enabled = false
 vision.Parent = Lighting
@@ -78,20 +78,13 @@ local senseLight = Instance.new("PointLight")
 senseLight.Name = "BlindSenseGlow"
 senseLight.Color = Color3.fromRGB(105, 130, 138)
 senseLight.Brightness = 3.1
-senseLight.Range = 10
+senseLight.Range = 30
 senseLight.Shadows = false
 senseLight.Enabled = false
 
--- Direct surface samples make nearby geometry readable even when Lighting's
--- ambient/fog settings swallow local lights. The fixed pool is local-only and
--- allocation-free during play, so it cannot create the clone/performance issue.
+-- Remove the obsolete surface-dot preview if this client still has one.
 local oldGeometrySense = workspace:FindFirstChild("LocalBlindSenseGeometry")
-if oldGeometrySense then
-	oldGeometrySense:Destroy()
-end
-local geometrySense = Instance.new("Folder")
-geometrySense.Name = "LocalBlindSenseGeometry"
-geometrySense.Parent = workspace
+if oldGeometrySense then oldGeometrySense:Destroy() end
 
 local oldSoundFigures = workspace:FindFirstChild("LocalBlindSoundFigures")
 if oldSoundFigures then
@@ -100,76 +93,6 @@ end
 local soundFigures = Instance.new("Folder")
 soundFigures.Name = "LocalBlindSoundFigures"
 soundFigures.Parent = workspace
-
-local SENSE_COLUMNS = 7
-local SENSE_ROWS = 5
-local SENSE_RANGE = 12
-local senseDots: { Part } = {}
-for index = 1, SENSE_COLUMNS * SENSE_ROWS do
-	local dot = Instance.new("Part")
-	dot.Name = "SurfaceEcho"
-	dot.Shape = Enum.PartType.Ball
-	dot.Size = Vector3.one * 0.2
-	dot.Color = Color3.fromRGB(125, 155, 165)
-	dot.Material = Enum.Material.Neon
-	dot.Anchored = true
-	dot.CanCollide = false
-	dot.CanTouch = false
-	dot.CanQuery = false
-	dot.CastShadow = false
-	dot.Transparency = 1
-	dot.Parent = geometrySense
-	senseDots[index] = dot
-end
-
-local raycastParams = RaycastParams.new()
-raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-raycastParams.IgnoreWater = true
-local nextGeometrySenseAt = 0
-
-local function hideGeometrySense()
-	for _, dot in senseDots do
-		dot.Transparency = 1
-	end
-end
-
-local function updateGeometrySense(camera: Camera, ownCharacter: Model, now: number)
-	if now < nextGeometrySenseAt then
-		return
-	end
-	nextGeometrySenseAt = now + 0.065
-
-	local excluded: { Instance } = { ownCharacter, geometrySense, soundFigures }
-	for _, otherPlayer in Players:GetPlayers() do
-		if otherPlayer.Character and otherPlayer.Character ~= ownCharacter then
-			table.insert(excluded, otherPlayer.Character)
-		end
-	end
-	raycastParams.FilterDescendantsInstances = excluded
-
-	local viewport = camera.ViewportSize
-	local dotIndex = 0
-	for row = 0, SENSE_ROWS - 1 do
-		for column = 0, SENSE_COLUMNS - 1 do
-			dotIndex += 1
-			local screenX = viewport.X * (0.06 + 0.88 * column / (SENSE_COLUMNS - 1))
-			local screenY = viewport.Y * (0.24 + 0.72 * row / (SENSE_ROWS - 1))
-			local ray = camera:ViewportPointToRay(screenX, screenY)
-			local result = workspace:Raycast(ray.Origin, ray.Direction * SENSE_RANGE, raycastParams)
-			local dot = senseDots[dotIndex]
-			if result then
-				local distance = (result.Position - ray.Origin).Magnitude
-				local closeness = 1 - math.clamp(distance / SENSE_RANGE, 0, 1)
-				local size = 0.16 + closeness * 0.2
-				dot.Size = Vector3.one * size
-				dot.CFrame = CFrame.new(result.Position + result.Normal * 0.035)
-				dot.Transparency = 0.24 + (1 - closeness) * 0.54
-			else
-				dot.Transparency = 1
-			end
-		end
-	end
-end
 
 local lastRole = ""
 local roleSequence = 0
@@ -497,95 +420,58 @@ local function hideActualCharacter(character: Model, hidden: boolean)
 	end
 end
 
--- Blindness must not depend on how bright the map happens to be. Hide the
--- generated world locally while keeping its collision/query geometry intact;
--- the close-range surface echoes can still raycast against invisible walls.
-local hiddenMapParts: { [BasePart]: number } = {}
-local hiddenMapEffects: { [Instance]: boolean } = {}
-local hiddenMapTextures: { [Decal]: number } = {}
-local savedVisionFog: {color: Color3, start: number, finish: number}? = nil
+-- Only this player's lighting changes. Keep real walls and props visible so
+-- collision boundaries are readable; survivor bodies remain sound-driven below.
+local VISION_FADE_START = 17
+local VISION_DISTANCE = 30
+local savedVisionLighting: {
+    color: Color3, start: number, finish: number,
+    ambient: Color3, outdoor: Color3, exposure: number,
+}? = nil
 local pausedGrades: { [PostEffect]: boolean } = {}
-local hiddenMap: Instance? = nil
-local mapDescendantConnection: RBXScriptConnection? = nil
-
-local function hideMapDescendant(descendant: Instance)
-	if descendant:IsA("BasePart") then
-		if hiddenMapParts[descendant] == nil then
-			hiddenMapParts[descendant] = descendant.LocalTransparencyModifier
-		end
-		descendant.LocalTransparencyModifier = 1
-	elseif descendant:IsA("SurfaceGui") or descendant:IsA("BillboardGui")
-		or descendant:IsA("Light") or descendant:IsA("ParticleEmitter")
-		or descendant:IsA("Beam") or descendant:IsA("Highlight") then
-		hiddenMapEffects[descendant] = (descendant :: any).Enabled
-		;(descendant :: any).Enabled = false
-	elseif descendant:IsA("Decal") then
-		hiddenMapTextures[descendant] = descendant.Transparency
-		descendant.Transparency = 1
-	end
-end
-
-local function restoreHiddenMap()
-	if mapDescendantConnection then
-		mapDescendantConnection:Disconnect()
-		mapDescendantConnection = nil
-	end
-	for mapPart, original in hiddenMapParts do
-		if mapPart.Parent then
-			mapPart.LocalTransparencyModifier = original
-		end
-		hiddenMapParts[mapPart] = nil
-	end
-	hiddenMap = nil
-	for effect, enabled in hiddenMapEffects do
-		if effect.Parent then (effect :: any).Enabled = enabled end
-		hiddenMapEffects[effect] = nil
-	end
-	for texture, transparency in hiddenMapTextures do
-		if texture.Parent then texture.Transparency = transparency end
-		hiddenMapTextures[texture] = nil
-	end
-end
+local pausedAtmospheres: { [Atmosphere]: boolean } = {}
 
 local function setMapBlindness(enabled: boolean)
-	if not enabled then
-		if savedVisionFog then
-			Lighting.FogColor, Lighting.FogStart, Lighting.FogEnd = savedVisionFog.color, savedVisionFog.start, savedVisionFog.finish
-			savedVisionFog = nil
-			for effect, wasEnabled in pausedGrades do
-				if effect.Parent then effect.Enabled = wasEnabled end
-				pausedGrades[effect] = nil
-			end
-		end
-		if hiddenMap then
-			restoreHiddenMap()
-		end
-		return
-	end
-	if not savedVisionFog then
-		savedVisionFog = {color = Lighting.FogColor, start = Lighting.FogStart, finish = Lighting.FogEnd}
-	end
-	-- The sky and hidden map stay black; the blue echoes retain their own color.
-	Lighting.FogColor, Lighting.FogStart, Lighting.FogEnd = Color3.new(), 100000, 100001
-	for _, effect in Lighting:GetChildren() do
-		if effect:IsA("PostEffect") and effect ~= vision then
-			if pausedGrades[effect] == nil then pausedGrades[effect] = effect.Enabled end
-			effect.Enabled = false
-		end
-	end
-	local currentMap = Workspace:FindFirstChild("GeneratedMap")
-	if currentMap == hiddenMap then
-		return
-	end
-	restoreHiddenMap()
-	if not currentMap then
-		return
-	end
-	hiddenMap = currentMap
-	for _, descendant in currentMap:GetDescendants() do
-		hideMapDescendant(descendant)
-	end
-	mapDescendantConnection = currentMap.DescendantAdded:Connect(hideMapDescendant)
+    if not enabled then
+        local saved = savedVisionLighting
+        if saved then
+            Lighting.FogColor, Lighting.FogStart, Lighting.FogEnd = saved.color, saved.start, saved.finish
+            Lighting.Ambient, Lighting.OutdoorAmbient = saved.ambient, saved.outdoor
+            Lighting.ExposureCompensation = saved.exposure
+            savedVisionLighting = nil
+            for effect, wasEnabled in pausedGrades do
+                if effect.Parent then effect.Enabled = wasEnabled end
+                pausedGrades[effect] = nil
+            end
+            for atmosphere in pausedAtmospheres do
+                atmosphere.Parent = Lighting
+                pausedAtmospheres[atmosphere] = nil
+            end
+        end
+        return
+    end
+    if not savedVisionLighting then
+        savedVisionLighting = {
+            color = Lighting.FogColor, start = Lighting.FogStart, finish = Lighting.FogEnd,
+            ambient = Lighting.Ambient, outdoor = Lighting.OutdoorAmbient,
+            exposure = Lighting.ExposureCompensation,
+        }
+    end
+    Lighting.FogColor = Color3.new()
+    Lighting.FogStart, Lighting.FogEnd = VISION_FADE_START, VISION_DISTANCE
+    Lighting.Ambient = Color3.fromRGB(110, 118, 122)
+    Lighting.OutdoorAmbient = Lighting.Ambient
+    Lighting.ExposureCompensation = 0.15
+    for _, effect in Lighting:GetChildren() do
+        if effect:IsA("PostEffect") and effect ~= vision then
+            if pausedGrades[effect] == nil then pausedGrades[effect] = effect.Enabled end
+            effect.Enabled = false
+        elseif effect:IsA("Atmosphere") then
+            -- Even zero-density Atmosphere overrides distance fog.
+            pausedAtmospheres[effect] = true
+            effect.Parent = nil
+        end
+    end
 end
 
 Players.PlayerRemoving:Connect(function(target)
@@ -606,7 +492,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if isBlindOne then
 			title.Text = "YOU ARE THE BLIND ONE"
 			title.TextColor3 = Color3.fromRGB(210, 225, 232)
-			hint.Text = "Follow bright sound silhouettes • Get close to catch survivors • You carry no light"
+			hint.Text = "Follow bright sound silhouettes • Get close to catch survivors • Nearby paths visible; distance stays dark"
 			hint.TextColor3 = Color3.fromRGB(155, 185, 200)
 		else
 			title.Text = "YOU ARE A SURVIVOR"
@@ -628,17 +514,10 @@ RunService.RenderStepped:Connect(function(dt)
 			senseLight.Parent = ownRoot
 		end
 		senseLight.Enabled = true
-		-- A bright but tiny local bubble reveals only the floor and walls within a
-		-- few steps. It prevents blind wall-bumping without becoming normal vision.
-		senseLight.Brightness = 3.1 + math.sin(now * 2.4) * 0.16
-		local camera = workspace.CurrentCamera
-		if camera and ownCharacter then
-			updateGeometrySense(camera, ownCharacter, now)
-		end
+		senseLight.Brightness = 3.1
 	else
 		senseLight.Enabled = false
 		senseLight.Parent = nil
-		hideGeometrySense()
 	end
 
 	for _, target in Players:GetPlayers() do
@@ -711,7 +590,7 @@ RunService.RenderStepped:Connect(function(dt)
 		if strength > 0.02 then
 			local velocity = tagged.AssemblyLinearVelocity
 			local flatVelocity = Vector3.new(velocity.X, 0, velocity.Z)
-			local excluded: { Instance } = { tagged, soundFigures, geometrySense }
+			local excluded: { Instance } = { tagged, soundFigures }
 			if ownCharacter then
 				table.insert(excluded, ownCharacter)
 			end
@@ -785,4 +664,12 @@ RunService.RenderStepped:Connect(function(dt)
 			hiddenDecoyBalls[rock] = nil
 		end
 	end
+end)
+
+Responsive.Watch(gui, function(size)
+ title.Size = UDim2.fromOffset(math.min(520,size.X-24),58)
+ title.TextSize = if size.Y<500 then 20 else 25
+ hint.Size = UDim2.fromOffset(math.min(620,size.X-24),40)
+ hint.TextWrapped = true
+ hint.TextSize = 13
 end)

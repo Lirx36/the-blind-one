@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- Three-stage analog signal calibration for the five labyrinth generators.
 -- The player must stop a moving needle inside progressively narrower windows.
 local Players = game:GetService("Players")
@@ -223,13 +224,30 @@ local targetCenter = 0.5
 local targetWidth = 0.2
 local rng = Random.new()
 
-local function updateScale()
-	local camera = workspace.CurrentCamera
-	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-	scale.Scale = math.min(1, viewport.X / 680, viewport.Y / 450)
-end
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateScale)
-RunService.RenderStepped:Connect(updateScale)
+Responsive.Watch(gui, function(size, touch)
+	local compact = size.Y < 450 or size.X < 680
+	scale.Scale = math.min(1,(size.Y-16)/(if compact then 280 else 370))
+	panel.Size = UDim2.fromOffset(math.min(610, size.X-24), if compact then 280 else 370)
+	eyebrow.Visible = not compact
+	title.Position = UDim2.fromOffset(18, if compact then 10 else 48)
+	title.Size = UDim2.new(1, -80, 0, 38)
+	title.TextSize = if compact then 18 else 27
+	divider.Position = UDim2.fromOffset(28, if compact then 52 else 96)
+	roundLabel.Position = UDim2.fromOffset(28, if compact then 65 else 112)
+	roundLabel.Size = UDim2.new(0.5,-28,0,24)
+	strikesLabel.Position = UDim2.new(1,-28,0,if compact then 65 else 112)
+	strikesLabel.Size = UDim2.new(0.5,-28,0,24)
+	roundLabel.TextSize = if compact then 11 else 13
+	strikesLabel.TextSize = if compact then 11 else 12
+	track.Position = UDim2.fromOffset(34, if compact then 102 else 156)
+	status.Position = UDim2.fromOffset(28, if compact then 163 else 222)
+	calibrate.Position = UDim2.fromOffset(28, if compact then 199 else 264)
+	calibrate.Size = UDim2.new(1, -56, 0, 48)
+	calibrate.Text = if touch then "TAP TO CALIBRATE" else "SPACE / E / CLICK  //  CALIBRATE"
+	cancel.Size = UDim2.fromOffset(44, 44)
+	cancel.Position = UDim2.new(1, -12, 0, 8)
+	leaveHint.Position = UDim2.new(0.5, 0, 0, if compact then 251 else 333)
+end)
 
 local function blockMovement(_name: string, _state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
 	return Enum.ContextActionResult.Sink

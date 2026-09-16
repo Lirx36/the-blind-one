@@ -6,8 +6,14 @@
       "Remotes": {
         "$path": "src/ReplicatedStorage/Remotes.luau"
       },
-        "LobbyElevatorsV30": {
+      "LobbyElevatorsV30": {
         "$path": "lobby-src/ReplicatedStorage/LobbyElevators.luau"
+      },
+      "ResponsiveUI": {
+        "$path": "src/ReplicatedStorage/ResponsiveUI.luau"
+      },
+      "ElevatorChime": {
+        "$path": "src/ReplicatedStorage/ElevatorChime.luau"
       }
     },
     "ServerScriptService": {

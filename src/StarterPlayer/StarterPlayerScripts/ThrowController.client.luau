@@ -1,4 +1,5 @@
 --!strict
+local Responsive = require(game:GetService("ReplicatedStorage"):WaitForChild("ResponsiveUI"))
 -- E picks up a nearby rock. Slot 1 toggles equip; only an equipped rock can be
 -- thrown. Touch players get a dedicated button so looking around never throws.
 local Players = game:GetService("Players")
@@ -26,8 +27,8 @@ touchGui.Parent = player:WaitForChild("PlayerGui")
 local throwButton = Instance.new("TextButton")
 throwButton.Name = "ThrowButton"
 throwButton.AnchorPoint = Vector2.new(1, 1)
-throwButton.Position = UDim2.new(1, -32, 1, -132)
-throwButton.Size = UDim2.fromOffset(112, 64)
+throwButton.Position = UDim2.new(1, -86, 1, -140)
+throwButton.Size = UDim2.fromOffset(64, 48)
 throwButton.BackgroundColor3 = Color3.fromRGB(49, 20, 15)
 throwButton.BackgroundTransparency = 0.08
 throwButton.BorderSizePixel = 0
@@ -35,7 +36,7 @@ throwButton.AutoButtonColor = false
 throwButton.Font = Enum.Font.GothamBlack
 throwButton.Text = "THROW"
 throwButton.TextColor3 = Color3.fromRGB(241, 218, 198)
-throwButton.TextSize = 16
+throwButton.TextSize = 12
 throwButton.Visible = false
 throwButton.Parent = touchGui
 local throwCorner = Instance.new("UICorner")
@@ -47,6 +48,12 @@ throwStroke.Thickness = 2
 throwStroke.Transparency = 0.1
 throwStroke.Parent = throwButton
 
+local pickupButton = throwButton:Clone()
+pickupButton.Name = "PickupButton"
+pickupButton.Text = "PICK UP"
+pickupButton.TextSize = 12
+pickupButton.Position = UDim2.new(1,-14,1,-196)
+pickupButton.Parent = touchGui
 local pickupOutline = Instance.new("Highlight")
 pickupOutline.Name = "LocalBallPickupOutline"
 pickupOutline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -145,6 +152,11 @@ end
 
 RunService.RenderStepped:Connect(function()
 	local target = if player:GetAttribute("Role") ~= "BlindOne" and player:GetAttribute("PhotoModeActive") ~= true then lookedAtRock() else nil
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	pickupButton.Visible = Responsive.IsTouch() and target ~= nil and heldCount() < Config.MaxThrowables
+		and player:GetAttribute("InMatch") == true and player:GetAttribute("RepairMinigameActive") ~= true
+		and hum ~= nil and hum.Health > 0
+	prompt.Text = if Responsive.IsTouch() then "PICK UP" else "E  ·  PICK UP"
 	pickupOutline.Adornee = target
 	pickupOutline.Enabled = target ~= nil
 	pickupBillboard.Adornee = target
@@ -152,7 +164,7 @@ RunService.RenderStepped:Connect(function()
 	if not canUseRock() and player:GetAttribute("BallEquipped") == true then
 		player:SetAttribute("BallEquipped", false)
 	end
-	throwButton.Visible = UserInputService.TouchEnabled and canUseRock() and player:GetAttribute("BallEquipped") == true
+	throwButton.Visible = Responsive.IsTouch() and canUseRock() and player:GetAttribute("BallEquipped") == true
 end)
 
 throwButton.Activated:Connect(throwEquipped)
@@ -175,7 +187,14 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 		end
 	elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
 		throwEquipped()
-	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not UserInputService.TouchEnabled then
+	elseif input.UserInputType == Enum.UserInputType.MouseButton1 and not Responsive.IsTouch() then
 		throwEquipped()
 	end
 end)
+
+pickupButton.Activated:Connect(function()
+	local target = lookedAtRock()
+	local camera = Workspace.CurrentCamera
+	if target and camera then Remotes.Pickup:FireServer(target,camera.CFrame.Position,camera.CFrame.LookVector) end
+end)
+Responsive.Watch(touchGui,function() end)

@@ -27,7 +27,7 @@ return {
 	-- ---- monster: The Blind One ----
 	MonsterWanderSpeed = 9,
 	MonsterInvestigateSpeed = 14,
-	MonsterHuntSpeed = 19, -- just under SprintSpeed: sprinting CAN break line, but it screams your position
+	MonsterHuntSpeed = 17.5, -- below survivor sprint speed, above normal walking
 	MonsterCatchDistance = 5.5,
 	MonsterHearingFloor = 4, -- crouching stays below this threshold
 	BotNoiseCarry = 4, -- bot hears normal walking at about 80 studs
@@ -45,6 +45,7 @@ return {
 
 	-- ---- round ----
 	StudioSafeMode = false, -- allow Studio playtests to trigger death, jumpscares, and recovery UI
+	StudioAutoOpenGate = true, -- temporary: immediately open the exit gate during Studio playtests
 	RespawnDelay = 3,
 	MaxRespawns = 3, -- manual returns offered by the casualty terminal
 	SpawnGrace = 3, -- seconds of immunity right after (re)spawning
